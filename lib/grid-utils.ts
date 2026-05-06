@@ -1,5 +1,5 @@
-import { TOTAL_CELLS } from "./constants";
-import type { Cell, CellData, GridState } from "./types";
+import { DEFAULT_GRID_COLS, DEFAULT_GRID_ROWS } from "./constants";
+import type { Cell, CellData, CellPosition, GridState } from "./types";
 
 // ── Random Emoji ────────────────────────────────────────────
 
@@ -55,10 +55,55 @@ export function generateCellId(): string {
 	return crypto.randomUUID();
 }
 
+export function makePosition(row: number, col: number): CellPosition {
+	return { row, col };
+}
+
+export function getPositionKey(position: CellPosition): string {
+	return `${position.row}:${position.col}`;
+}
+
+export function isSamePosition(a: CellPosition, b: CellPosition): boolean {
+	return a.row === b.row && a.col === b.col;
+}
+
+export function comparePositions(a: CellPosition, b: CellPosition): number {
+	return a.row - b.row || a.col - b.col;
+}
+
+export function isPositionVisible(
+	position: CellPosition,
+	cols: number,
+	rows: number,
+): boolean {
+	return (
+		position.row >= 0 &&
+		position.row < rows &&
+		position.col >= 0 &&
+		position.col < cols
+	);
+}
+
 /**
- * Create an empty cell at a given position
+ * Convert legacy linear indexes to stable row/column coordinates.
  */
-export function createEmptyCell(position: number): Cell {
+export function normalizePosition(
+	position: Cell["position"] | number,
+): CellPosition {
+	if (typeof position === "number") {
+		return {
+			row: Math.floor(position / DEFAULT_GRID_COLS),
+			col: position % DEFAULT_GRID_COLS,
+		};
+	}
+
+	return position;
+}
+
+/**
+ * Create an empty cell at a given row/column coordinate.
+ */
+export function createEmptyCell(position: CellPosition): Cell {
 	return {
 		id: generateCellId(),
 		position,
@@ -66,53 +111,123 @@ export function createEmptyCell(position: number): Cell {
 	};
 }
 
-/**
- * Create a full empty grid with TOTAL_CELLS cells
- */
-export function createEmptyGrid(): GridState {
-	const cells: Cell[] = Array.from({ length: TOTAL_CELLS }, (_, i) =>
-		createEmptyCell(i),
+export function createGridCells(cols: number, rows: number): Cell[] {
+	return Array.from({ length: cols * rows }, (_, i) =>
+		createEmptyCell(makePosition(Math.floor(i / cols), i % cols)),
 	);
+}
+
+/**
+ * Create a full empty grid.
+ */
+export function createEmptyGrid(
+	cols = DEFAULT_GRID_COLS,
+	rows = DEFAULT_GRID_ROWS,
+): GridState {
 	return {
-		cells,
+		cells: createGridCells(cols, rows),
 		updatedAt: Date.now(),
 	};
 }
 
 /**
- * Swap two cells' positions in the grid
+ * Normalize legacy cells and make sure the visible grid has exactly one cell
+ * for every coordinate. Non-empty cells outside the current dimensions are kept
+ * so shrinking and later expanding the grid does not destroy user data.
  */
-export function swapCells(
+export function normalizeCells(
 	cells: Cell[],
-	fromIndex: number,
-	toIndex: number,
+	cols: number,
+	rows: number,
 ): Cell[] {
-	const newCells = [...cells];
-	const fromCell = { ...newCells[fromIndex], position: toIndex };
-	const toCell = { ...newCells[toIndex], position: fromIndex };
-	newCells[fromIndex] = toCell;
-	newCells[toIndex] = fromCell;
-	return newCells;
+	const byPosition = new Map<string, Cell>();
+
+	for (const cell of cells) {
+		const position = normalizePosition(cell.position);
+		const normalizedCell = { ...cell, position };
+		const key = getPositionKey(position);
+		const existing = byPosition.get(key);
+
+		if (!existing || existing.data.type === "empty") {
+			byPosition.set(key, normalizedCell);
+		}
+	}
+
+	for (let row = 0; row < rows; row += 1) {
+		for (let col = 0; col < cols; col += 1) {
+			const position = makePosition(row, col);
+			const key = getPositionKey(position);
+			if (!byPosition.has(key)) {
+				byPosition.set(key, createEmptyCell(position));
+			}
+		}
+	}
+
+	return [...byPosition.values()].sort((a, b) =>
+		comparePositions(a.position, b.position),
+	);
 }
 
-/**
- * Update a cell's data at a given position
- */
-export function updateCellData(
+export function getVisibleCells(
 	cells: Cell[],
-	position: number,
-	data: CellData,
+	cols: number,
+	rows: number,
 ): Cell[] {
-	return cells.map((cell) =>
-		cell.position === position ? { ...cell, data } : cell,
+	return normalizeCells(cells, cols, rows).filter((cell) =>
+		isPositionVisible(cell.position, cols, rows),
 	);
 }
 
 /**
- * Clear a cell (make it empty) at a given position
+ * Swap two cells' positions in the grid.
  */
-export function clearCell(cells: Cell[], position: number): Cell[] {
-	return updateCellData(cells, position, { type: "empty" });
+export function swapCells(
+	cells: Cell[],
+	fromPosition: CellPosition,
+	toPosition: CellPosition,
+): Cell[] {
+	return cells.map((cell) => {
+		if (isSamePosition(cell.position, fromPosition)) {
+			return { ...cell, position: toPosition };
+		}
+
+		if (isSamePosition(cell.position, toPosition)) {
+			return { ...cell, position: fromPosition };
+		}
+
+		return cell;
+	});
+}
+
+/**
+ * Update a cell's data at a given position.
+ */
+export function updateCellData(
+	cells: Cell[],
+	position: CellPosition,
+	data: CellData,
+): Cell[] {
+	let didUpdate = false;
+	const updatedCells = cells.map((cell) => {
+		if (!isSamePosition(cell.position, position)) return cell;
+		didUpdate = true;
+		return { ...cell, data };
+	});
+
+	return didUpdate
+		? updatedCells
+		: [...updatedCells, { ...createEmptyCell(position), data }];
+}
+
+/**
+ * Clear a cell (make it empty) at a given position, removing accent color.
+ */
+export function clearCell(cells: Cell[], position: CellPosition): Cell[] {
+	return cells.map((cell) =>
+		isSamePosition(cell.position, position)
+			? { ...cell, data: { type: "empty" }, accentColor: undefined }
+			: cell,
+	);
 }
 
 /**

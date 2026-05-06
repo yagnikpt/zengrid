@@ -46,7 +46,7 @@ export function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
 		<div
 			ref={containerRef}
 			role="dialog"
-			className="absolute left-0 top-full z-100 mt-1 rounded-lg border border-white/10 bg-black shadow-2xl"
+			className="absolute left-0 top-full z-100 mt-1 rounded-lg border border-border bg-popover text-popover-foreground shadow-2xl"
 			onClick={(e) => e.stopPropagation()}
 			onKeyDown={(e) => e.stopPropagation()}
 		>

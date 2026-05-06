@@ -1,4 +1,4 @@
-import { mockApi } from "../api/mock";
+import { supabase } from "../supabase/client";
 import {
 	authTokensStorage,
 	refreshTokenStorage,
@@ -6,42 +6,148 @@ import {
 } from "../storage";
 import type { AuthTokens, User } from "../types";
 
-/**
- * Start the OAuth flow using browser.identity.launchWebAuthFlow.
- * For now, this uses the mock API directly (no real OAuth provider).
- *
- * When connecting to a real backend, replace the mock call with
- * a real launchWebAuthFlow + token exchange.
- */
-export async function loginWithProvider(
-	provider: "google" | "github",
+type AuthProvider = "google" | "github";
+
+function mapUser(supabaseUser: any, fallbackProvider: AuthProvider): User {
+	const provider = (supabaseUser?.app_metadata?.provider ??
+		fallbackProvider) as AuthProvider;
+	const metadata = supabaseUser?.user_metadata ?? {};
+	const name =
+		metadata.full_name ??
+		metadata.name ??
+		metadata.preferred_username ??
+		supabaseUser?.email?.split("@")[0] ??
+		"User";
+
+	return {
+		id: supabaseUser.id,
+		email: supabaseUser.email ?? "",
+		name,
+		avatar: metadata.avatar_url,
+		provider,
+	};
+}
+
+function mapTokens(session: any): AuthTokens {
+	const expiresAt = session.expires_at
+		? session.expires_at * 1000
+		: Date.now() + (session.expires_in ?? 3600) * 1000;
+
+	return {
+		accessToken: session.access_token,
+		refreshToken: session.refresh_token,
+		expiresAt,
+	};
+}
+
+async function persistAuth(user: User, tokens: AuthTokens): Promise<void> {
+	await Promise.all([
+		userStorage.setValue(user),
+		authTokensStorage.setValue(tokens),
+		refreshTokenStorage.setValue(tokens.refreshToken),
+	]);
+}
+
+async function completeSessionFromRedirect(
+	redirectedTo: string,
+	provider: AuthProvider,
 ): Promise<{ user: User; tokens: AuthTokens } | null> {
-	try {
-		// In a real implementation, you would:
-		// 1. Build the OAuth URL for the provider
-		// 2. Call browser.identity.launchWebAuthFlow({ url, interactive: true })
-		// 3. Extract the auth code from the redirect URL
-		// 4. Exchange the code for tokens via your backend
+	const callbackUrl = new URL(redirectedTo);
+	const hashParams = new URLSearchParams(callbackUrl.hash.replace(/^#/, ""));
 
-		// Mock: simulate the entire flow
-		const mockCode = `mock-code-${Date.now()}`;
-		const result = await mockApi.exchangeOAuthCode(provider, mockCode);
+	const callbackError =
+		callbackUrl.searchParams.get("error_description") ||
+		hashParams.get("error_description") ||
+		callbackUrl.searchParams.get("error") ||
+		hashParams.get("error");
+	if (callbackError) {
+		console.error("OAuth callback error:", callbackError);
+		return null;
+	}
 
-		if (!result.ok || !result.data) {
-			console.error("OAuth failed:", result.error);
+	const code = callbackUrl.searchParams.get("code");
+	if (code) {
+		const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+		if (error || !data.session || !data.user) {
+			console.error("Code exchange failed:", error?.message);
 			return null;
 		}
 
-		const { user, tokens } = result.data;
-
-		// Persist auth state
-		await Promise.all([
-			userStorage.setValue(user),
-			authTokensStorage.setValue(tokens),
-			refreshTokenStorage.setValue(tokens.refreshToken),
-		]);
-
+		const user = mapUser(data.user, provider);
+		const tokens = mapTokens(data.session);
+		await persistAuth(user, tokens);
 		return { user, tokens };
+	}
+
+	const accessToken = hashParams.get("access_token");
+	const refreshToken = hashParams.get("refresh_token");
+	if (!accessToken || !refreshToken) {
+		console.error("OAuth callback missing access/refresh token");
+		return null;
+	}
+
+	const { data, error } = await supabase.auth.setSession({
+		access_token: accessToken,
+		refresh_token: refreshToken,
+	});
+	if (error || !data.session || !data.user) {
+		console.error("Failed to set Supabase session:", error?.message);
+		return null;
+	}
+
+	const user = mapUser(data.user, provider);
+	const tokens = mapTokens(data.session);
+	await persistAuth(user, tokens);
+	return { user, tokens };
+}
+
+/**
+ * Start OAuth in browser.identity and finalize a Supabase session.
+ */
+export async function loginWithProvider(
+	provider: AuthProvider,
+): Promise<{ user: User; tokens: AuthTokens } | null> {
+	try {
+		const redirectTo = browser.identity.getRedirectURL("supabase-auth-callback");
+
+		const { data, error } = await supabase.auth.signInWithOAuth({
+			provider,
+			options: {
+				redirectTo,
+				skipBrowserRedirect: true,
+			},
+		});
+
+		console.info("[auth] OAuth start", {
+			provider,
+			redirectTo,
+			oauthUrl: data?.url,
+			error: error?.message,
+		});
+
+		if (error || !data.url) {
+			console.error("Failed to start OAuth:", error?.message);
+			return null;
+		}
+
+		if (!data.url.startsWith("http")) {
+			console.error("Invalid OAuth URL from Supabase:", data.url);
+			return null;
+		}
+
+		const redirectedTo = await browser.identity.launchWebAuthFlow({
+			url: data.url,
+			interactive: true,
+		});
+
+		console.info("[auth] OAuth redirect result", { redirectedTo });
+
+		if (!redirectedTo) {
+			console.error("No redirect URL returned from launchWebAuthFlow");
+			return null;
+		}
+
+		return completeSessionFromRedirect(redirectedTo, provider);
 	} catch (err) {
 		console.error("Login error:", err);
 		return null;
@@ -49,13 +155,13 @@ export async function loginWithProvider(
 }
 
 /**
- * Log the user out: clear all auth state
+ * Log the user out: revoke Supabase session and clear local auth state.
  */
 export async function logout(): Promise<void> {
 	try {
-		await mockApi.logout();
+		await supabase.auth.signOut();
 	} catch {
-		// Ignore API errors during logout
+		// Ignore remote errors during logout
 	}
 
 	await Promise.all([
@@ -75,19 +181,23 @@ export async function isTokenValid(): Promise<boolean> {
 }
 
 /**
- * Attempt to refresh the access token using the stored refresh token
+ * Refresh the access token using Supabase Auth and the stored refresh token.
  */
 export async function refreshAccessToken(): Promise<boolean> {
 	const refreshToken = await refreshTokenStorage.getValue();
 	if (!refreshToken) return false;
 
-	const result = await mockApi.refreshToken(refreshToken);
-	if (!result.ok || !result.data) return false;
+	const { data, error } = await supabase.auth.refreshSession({
+		refresh_token: refreshToken,
+	});
 
-	await Promise.all([
-		authTokensStorage.setValue(result.data),
-		refreshTokenStorage.setValue(result.data.refreshToken),
-	]);
+	if (error || !data.session || !data.user) {
+		console.error("Failed to refresh session:", error?.message);
+		return false;
+	}
 
+	const user = mapUser(data.user, "github");
+	const tokens = mapTokens(data.session);
+	await persistAuth(user, tokens);
 	return true;
 }

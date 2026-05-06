@@ -10,11 +10,16 @@ export default defineConfig({
 		},
 	},
 	manifest: {
-		name: "Grid Bookmarks",
+		name: "ZenGrid",
 		description:
 			"A beautiful grid-based bookmark manager for your new tab page",
 		permissions: ["storage", "identity"],
 		host_permissions: ["https://*/*", "http://*/*"],
+		browser_specific_settings: {
+			gecko: {
+				id: "zengrid@local",
+			},
+		},
 	},
 	vite: () => ({
 		plugins: [tailwindcss()],

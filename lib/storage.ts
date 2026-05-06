@@ -1,7 +1,7 @@
 import { storage } from "wxt/utils/storage";
-import type { GridState, User, AuthTokens } from "./types";
-import { TOTAL_CELLS } from "./constants";
+import { DEFAULT_GRID_COLS, DEFAULT_GRID_ROWS } from "./constants";
 import { createEmptyGrid } from "./grid-utils";
+import type { AppSettings, AuthTokens, GridState, User } from "./types";
 
 // ── Grid State (persistent local cache) ─────────────────────
 
@@ -9,6 +9,25 @@ export const gridStateStorage = storage.defineItem<GridState>(
 	"local:gridState",
 	{
 		fallback: createEmptyGrid(),
+	},
+);
+
+// ── Settings (persistent local cache) ───────────────────────
+
+export const DEFAULT_APP_SETTINGS: AppSettings = {
+	grid: {
+		cols: DEFAULT_GRID_COLS,
+		rows: DEFAULT_GRID_ROWS,
+	},
+	theme: "system",
+	openIn: "new-tab",
+	updatedAt: Date.now(),
+};
+
+export const settingsStorage = storage.defineItem<AppSettings>(
+	"local:settings",
+	{
+		fallback: DEFAULT_APP_SETTINGS,
 	},
 );
 

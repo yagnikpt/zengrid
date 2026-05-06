@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { userStorage, authTokensStorage } from "../storage";
-import { loginWithProvider, logout as doLogout } from "../auth/oauth";
+import {
+	isTokenValid,
+	loginWithProvider,
+	logout as doLogout,
+	refreshAccessToken,
+} from "../auth/oauth";
 import type { User } from "../types";
 
 /**
@@ -20,11 +25,35 @@ export function useAuth() {
 		async function loadAuth() {
 			try {
 				const cachedUser = await userStorage.getValue();
-				if (!cancelled) {
-					setUser(cachedUser);
+				if (!cachedUser) {
+					if (!cancelled) setUser(null);
+					return;
 				}
+
+				const hasValidToken = await isTokenValid();
+				if (hasValidToken) {
+					if (!cancelled) setUser(cachedUser);
+					return;
+				}
+
+				// Browser restart / extension update clears session storage.
+				// Try to restore session with persisted refresh token.
+				const refreshed = await refreshAccessToken();
+				if (refreshed) {
+					const restoredUser = await userStorage.getValue();
+					if (!cancelled) setUser(restoredUser ?? cachedUser);
+					return;
+				}
+
+				// If refresh failed, clear stale local auth to avoid false "signed in" UI.
+				await Promise.all([
+					userStorage.setValue(null),
+					authTokensStorage.setValue(null),
+				]);
+				if (!cancelled) setUser(null);
 			} catch (err) {
 				console.warn("Failed to load user from storage:", err);
+				if (!cancelled) setUser(null);
 			} finally {
 				if (!cancelled) {
 					setIsLoading(false);

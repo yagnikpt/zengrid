@@ -1,5 +1,5 @@
 export default defineBackground(() => {
-	console.log("Grid Bookmarks background initialized", {
+	console.log("ZenGrid background initialized", {
 		id: browser.runtime.id,
 	});
 
@@ -31,9 +31,9 @@ export default defineBackground(() => {
 	// Handle extension install/update
 	browser.runtime.onInstalled.addListener((details) => {
 		if (details.reason === "install") {
-			console.log("Grid Bookmarks installed");
+			console.log("ZenGrid installed");
 		} else if (details.reason === "update") {
-			console.log("Grid Bookmarks updated");
+			console.log("ZenGrid updated");
 		}
 	});
 });

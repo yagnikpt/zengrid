@@ -3,6 +3,7 @@ import type { BookmarkCellData } from "@/lib/types";
 
 interface BookmarkCellProps {
 	data: BookmarkCellData;
+	accentColor?: string;
 }
 
 export function BookmarkCell({ data }: BookmarkCellProps) {
@@ -10,13 +11,13 @@ export function BookmarkCell({ data }: BookmarkCellProps) {
 	const faviconSrc = favicon || getFaviconUrl(url);
 
 	return (
-		<div className="flex items-center gap-1.5 w-full h-full px-1.5 overflow-hidden">
-			<div className="w-4 h-4 shrink-0 flex items-center justify-center">
+		<div className="flex items-center gap-3 w-full h-full px-3 overflow-hidden">
+			<div className="size-5 shrink-0 flex items-center justify-center">
 				{faviconSrc ? (
 					<img
 						src={faviconSrc}
-						alt=""
-						className="w-4 h-4 object-contain"
+						alt={title}
+						className="size-5 rounded object-contain"
 						loading="lazy"
 						onError={(e) => {
 							(e.target as HTMLImageElement).style.display = "none";
@@ -24,17 +25,22 @@ export function BookmarkCell({ data }: BookmarkCellProps) {
 							if (parent) {
 								parent.textContent = title.charAt(0).toUpperCase();
 								parent.className =
-									"w-4 h-4 flex-shrink-0 flex items-center justify-center text-[10px] font-bold text-white/40";
+									"size-5 flex-shrink-0 flex items-center justify-center text-[10px] font-bold text-muted-foreground";
 							}
 						}}
 					/>
 				) : (
-					<span className="text-[10px] font-bold text-white/40">
+					<span className="text-[10px] font-bold text-muted-foreground">
 						{title.charAt(0).toUpperCase()}
 					</span>
 				)}
 			</div>
-			<span className="text-xs leading-none text-white/70 truncate">
+			<span
+				className="text-sm truncate text-foreground max-w-full"
+				style={{
+					textBoxTrim: "trim-both",
+				}}
+			>
 				{title}
 			</span>
 		</div>

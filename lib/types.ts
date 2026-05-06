@@ -21,10 +21,35 @@ export interface EmptyCellData {
 
 export type CellData = BookmarkCellData | LabelCellData | EmptyCellData;
 
+export interface CellPosition {
+	row: number;
+	col: number;
+}
+
 export interface Cell {
 	id: string;
-	position: number;
+	/**
+	 * Stable grid coordinate. Unlike a linear index, this does not change when
+	 * the number of columns changes, so resizing the grid preserves placement.
+	 */
+	position: CellPosition;
 	data: CellData;
+	accentColor?: string;
+}
+
+// ── Settings ────────────────────────────────────────────────
+
+export type ThemePreference = "light" | "dark" | "system";
+export type OpenInPreference = "new-tab" | "current-tab";
+
+export interface AppSettings {
+	grid: {
+		cols: number;
+		rows: number;
+	};
+	theme: ThemePreference;
+	openIn: OpenInPreference;
+	updatedAt: number;
 }
 
 // ── Grid State ──────────────────────────────────────────────

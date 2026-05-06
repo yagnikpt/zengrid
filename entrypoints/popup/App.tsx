@@ -38,44 +38,44 @@ function App() {
 	if (isLoading) {
 		return (
 			<div className="w-64 p-4 text-center">
-				<p className="text-sm text-gray-400">Loading...</p>
+				<p className="text-sm text-muted-foreground">Loading...</p>
 			</div>
 		);
 	}
 
 	return (
-		<div className="w-64 p-4 bg-gray-900 text-white">
-			<h2 className="text-sm font-semibold mb-3">Grid Bookmarks</h2>
+		<div className="w-64 p-4">
+			<h2 className="text-sm font-semibold mb-3">ZenGrid</h2>
 
 			{user ? (
 				<div className="space-y-3">
 					<div className="flex items-center gap-2">
-						<div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold">
+						<div className="size-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
 							{user.name.charAt(0).toUpperCase()}
 						</div>
 						<div>
 							<p className="text-xs font-medium">{user.name}</p>
-							<p className="text-[10px] text-gray-400">{user.email}</p>
+							<p className="text-[10px] text-muted-foreground">{user.email}</p>
 						</div>
 					</div>
 					<button
 						type="button"
 						onClick={handleLogout}
-						className="w-full py-1.5 px-3 rounded-md text-xs bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors"
+						className="w-full py-1.5 px-3 rounded-md text-xs bg-muted text-card-foreground"
 					>
 						Sign out
 					</button>
 				</div>
 			) : (
 				<div className="space-y-2">
-					<p className="text-xs text-gray-400">
+					<p className="text-xs">
 						Not signed in. Open a new tab to access your bookmarks grid.
 					</p>
 				</div>
 			)}
 
-			<div className="mt-3 pt-3 border-t border-gray-800">
-				<p className="text-[10px] text-gray-500">
+			<div className="mt-3 pt-3 border-t">
+				<p className="text-[10px] text-muted-foreground">
 					Open a new tab to manage your bookmarks
 				</p>
 			</div>

@@ -37,3 +37,5 @@ bun.lockb
 
 # Zip artifacts
 *.zip
+
+skills-lock.json

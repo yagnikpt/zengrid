@@ -1,6 +1,6 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ExternalLink, Pencil, Trash2 } from "lucide-react";
+import { ExternalLink, Palette, Pencil, Trash2, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -8,16 +8,20 @@ import {
 	ContextMenuContent,
 	ContextMenuItem,
 	ContextMenuSeparator,
+	ContextMenuSub,
+	ContextMenuSubContent,
+	ContextMenuSubTrigger,
 	ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { getFaviconUrl } from "@/lib/constants";
+import { ACCENT_COLORS, getFaviconUrl } from "@/lib/constants";
 import {
 	fetchPageTitle,
 	getRandomEmoji,
 	isValidUrl,
 	normalizeUrl,
 } from "@/lib/grid-utils";
-import type { CellData, Cell as CellType } from "@/lib/types";
+import type { CellData, CellPosition, Cell as CellType, OpenInPreference } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { BookmarkCell } from "./BookmarkCell";
 import { EmojiPicker } from "./EmojiPicker";
 import { EmptyCell } from "./EmptyCell";
@@ -25,11 +29,26 @@ import { LabelCell } from "./LabelCell";
 
 interface CellProps {
 	cell: CellType;
-	onUpdateCell: (position: number, data: CellData) => void;
-	onRemoveCell: (position: number) => void;
+	openIn: OpenInPreference;
+	isSelected: boolean;
+	shiftHeld: boolean;
+	onUpdateCell: (position: CellPosition, data: CellData) => void;
+	onRemoveCell: (position: CellPosition) => void;
+	onSetAccentColor: (
+		position: CellPosition,
+		accentColor: string | undefined,
+	) => void;
 }
 
-export function Cell({ cell, onUpdateCell, onRemoveCell }: CellProps) {
+export function Cell({
+	cell,
+	openIn,
+	isSelected,
+	shiftHeld,
+	onUpdateCell,
+	onRemoveCell,
+	onSetAccentColor,
+}: CellProps) {
 	const [isEditing, setIsEditing] = useState(false);
 	const [inputValue, setInputValue] = useState("");
 	const [pendingEmoji, setPendingEmoji] = useState("");
@@ -51,12 +70,6 @@ export function Cell({ cell, onUpdateCell, onRemoveCell }: CellProps) {
 		data: { position: cell.position, cell },
 		disabled: isEditing || showEmojiPicker,
 	});
-
-	const style: React.CSSProperties = {
-		transform: CSS.Transform.toString(transform),
-		transition,
-		opacity: isDragging ? 0.3 : 1,
-	};
 
 	// Merge refs
 	const mergedRef = useCallback(
@@ -214,23 +227,27 @@ export function Cell({ cell, onUpdateCell, onRemoveCell }: CellProps) {
 	);
 
 	// Click handler
-	const handleClick = useCallback(() => {
+	const handleClick = useCallback((e: React.MouseEvent) => {
+		// Shift is handled by Grid's rubber-band, don't open/edit
+		if (e.shiftKey) { e.preventDefault(); return; }
 		if (isEditing || showEmojiPicker) return;
 
 		switch (cell.data.type) {
 			case "empty":
-				// New cell: show input with emoji button
 				startEditing();
 				break;
 			case "label":
-				// Edit text only, keep existing emoji
 				startEditing(cell.data.text, cell.data.emoji);
 				break;
 			case "bookmark":
-				window.open(cell.data.url, "_blank", "noopener");
+				if (openIn === "current-tab") {
+					window.open(cell.data.url, "_self");
+				} else {
+					window.open(cell.data.url, "_blank", "noopener");
+				}
 				break;
 		}
-	}, [cell.data, isEditing, showEmojiPicker, startEditing]);
+	}, [cell.data, isEditing, showEmojiPicker, startEditing, openIn]);
 
 	// Emoji selected from picker (for label cells or new cells)
 	const handleEmojiSelect = useCallback(
@@ -275,49 +292,70 @@ export function Cell({ cell, onUpdateCell, onRemoveCell }: CellProps) {
 		onRemoveCell(cell.position);
 	}, [cell.position, onRemoveCell]);
 
+	// Resolve accent color config for this cell
+	const accentConfig = cell.accentColor
+		? ACCENT_COLORS.find((c) => c.accent === cell.accentColor)
+		: undefined;
+
 	// ── Render ──────────────────────────────────────────────
+
+	const cellStyle: React.CSSProperties = {
+		transform: CSS.Transform.toString(transform),
+		transition,
+		opacity: isDragging ? 0.3 : 1,
+		...(accentConfig && cell.data.type !== "empty"
+			? { backgroundColor: accentConfig.bg }
+			: {}),
+	};
 
 	const cellContent = (
 		<button
+			data-cell-id={cell.data.type !== "empty" ? cell.id : undefined}
 			ref={mergedRef}
-			style={style}
+			style={cellStyle}
 			{...attributes}
-			{...(cell.data.type !== "empty" && !isEditing && !showEmojiPicker
+			{...(cell.data.type !== "empty" && !isEditing && !showEmojiPicker && !shiftHeld
 				? listeners
 				: {})}
-			// role="button"
 			tabIndex={0}
-			className={`
-        relative select-none overflow-visible
-        border-r border-b border-white/6"
-        transition-colors duration-100
-        ${isEditing ? "" : "cursor-pointer hover:bg-white/4"}
-        ${isDragging ? "z-50 bg-white/8" : ""}
-      `}
+			className={cn(
+				"relative select-none overflow-visible",
+				"border-r border-b border-border/60",
+				"transition-colors duration-100",
+				!isEditing && "cursor-pointer hover:bg-foreground/4",
+				isDragging && "z-50 bg-foreground/8",
+				isSelected && "ring-2 ring-inset ring-primary bg-primary/10",
+			)}
 			onClick={handleClick}
+	
 			onKeyDown={(e) => {
 				if (!isEditing && (e.key === "Enter" || e.key === " ")) {
 					e.preventDefault();
-					handleClick();
+					handleClick(e as unknown as React.MouseEvent);
 				}
 			}}
 			onDragOver={handleDragOver}
 			onDrop={handleDrop}
 		>
 			{isEditing ? (
-				<div className="flex items-center w-full h-full px-1 gap-1">
+				<div
+					className={cn(
+						"flex items-center w-full h-full px-3",
+						cell.data.type === "bookmark" ? "gap-3" : "gap-1.5",
+					)}
+				>
 					{editingBookmarkTitle.current && cell.data.type === "bookmark" ? (
-						<div className="w-4 h-4 shrink-0 flex items-center justify-center">
+						<div className="size-5 shrink-0 flex items-center justify-center">
 							<img
 								src={cell.data.favicon || getFaviconUrl(cell.data.url)}
-								alt=""
-								className="w-4 h-4 object-contain"
+								alt={cell.data.title}
+								className="size-5 object-contain rounded"
 							/>
 						</div>
 					) : (
 						<button
 							type="button"
-							className="text-base shrink-0 leading-none hover:scale-110 transition-transform"
+							className="text-xl shrink-0 leading-none hover:scale-110 transition-transform"
 							onClick={(e) => {
 								e.stopPropagation();
 								setShowEmojiPicker((v) => !v);
@@ -335,7 +373,10 @@ export function Cell({ cell, onUpdateCell, onRemoveCell }: CellProps) {
 						onKeyDown={handleKeyDown}
 						onBlur={handleBlur}
 						placeholder="url or text"
-						className="w-full h-full bg-transparent text-xs text-white/90 placeholder-white/20 outline-none"
+						className={cn(
+							"w-full h-full bg-transparent text-sm text-foreground/90 placeholder-muted-foreground/50 outline-none",
+							cell.data.type === "label" && "font-semibold",
+						)}
 						onClick={(e) => e.stopPropagation()}
 					/>
 					{showEmojiPicker && (
@@ -350,9 +391,15 @@ export function Cell({ cell, onUpdateCell, onRemoveCell }: CellProps) {
 				</div>
 			) : (
 				<>
-					{cell.data.type === "bookmark" && <BookmarkCell data={cell.data} />}
+					{cell.data.type === "bookmark" && (
+						<BookmarkCell data={cell.data} accentColor={cell.accentColor} />
+					)}
 					{cell.data.type === "label" && (
-						<LabelCell data={cell.data} onEmojiClick={handleLabelEmojiClick} />
+						<LabelCell
+							data={cell.data}
+							accentColor={cell.accentColor}
+							onEmojiClick={handleLabelEmojiClick}
+						/>
 					)}
 					{cell.data.type === "empty" && <EmptyCell />}
 					{/* Emoji picker for non-editing label cells (emoji button click) */}
@@ -395,6 +442,42 @@ export function Cell({ cell, onUpdateCell, onRemoveCell }: CellProps) {
 						Edit label
 					</ContextMenuItem>
 				)}
+				<ContextMenuSub>
+					<ContextMenuSubTrigger>
+						<Palette className="mr-2 h-3.5 w-3.5" />
+						Accent color
+					</ContextMenuSubTrigger>
+					<ContextMenuSubContent className="min-w-35">
+						{ACCENT_COLORS.map((color) => (
+							<ContextMenuItem
+								key={color.accent}
+								onClick={() => onSetAccentColor(cell.position, color.accent)}
+							>
+								<span
+									className="mr-2 inline-block h-3 w-3 rounded-full shrink-0"
+									style={{ backgroundColor: color.accent }}
+								/>
+								{color.name}
+								{cell.accentColor === color.accent && (
+									<span className="ml-auto text-muted-foreground">
+										&#10003;
+									</span>
+								)}
+							</ContextMenuItem>
+						))}
+						{cell.accentColor && (
+							<>
+								<ContextMenuSeparator />
+								<ContextMenuItem
+									onClick={() => onSetAccentColor(cell.position, undefined)}
+								>
+									<X className="mr-2 h-3.5 w-3.5" />
+									Remove
+								</ContextMenuItem>
+							</>
+						)}
+					</ContextMenuSubContent>
+				</ContextMenuSub>
 				<ContextMenuSeparator />
 				<ContextMenuItem variant="destructive" onClick={handleDelete}>
 					<Trash2 className="mr-2 h-3.5 w-3.5" />

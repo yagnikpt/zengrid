@@ -2,26 +2,40 @@ import type { LabelCellData } from "@/lib/types";
 
 interface LabelCellProps {
 	data: LabelCellData;
+	accentColor?: string;
 	onEmojiClick?: () => void;
 }
 
-export function LabelCell({ data, onEmojiClick }: LabelCellProps) {
+export function LabelCell({ data, accentColor, onEmojiClick }: LabelCellProps) {
 	const { text, emoji } = data;
 
 	return (
-		<div className="flex items-center gap-1.5 w-full h-full px-1.5 overflow-hidden">
+		<div className="flex items-center gap-1.5 w-full h-full px-3 overflow-hidden">
 			<button
 				type="button"
-				className="text-base shrink-0 leading-none hover:scale-110 transition-transform"
+				className="text-xl shrink-0 leading-none hover:scale-110 transition-transform"
 				onClick={(e) => {
 					e.stopPropagation();
 					onEmojiClick?.();
 				}}
-				title="Change emoji"
+				title="Change Symbol"
 			>
 				{emoji}
 			</button>
-			<span className="text-xs leading-none text-white/70 truncate">
+			<span
+				className="text-sm truncate text-foreground font-semibold"
+				style={{
+					...(accentColor
+						? {
+								textDecorationLine: "underline",
+								textDecorationColor: accentColor,
+								textUnderlineOffset: "2px",
+								textDecorationThickness: "2px",
+							}
+						: {}),
+					textBoxTrim: "trim-both",
+				}}
+			>
 				{text}
 			</span>
 		</div>
