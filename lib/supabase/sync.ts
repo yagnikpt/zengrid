@@ -77,7 +77,9 @@ function toCellRows(userId: string, cells: Cell[]) {
 					favicon: cell.data.favicon ?? null,
 					label_text: null,
 					emoji: null,
-					metadata: {},
+					metadata: {
+						faviconBackdrop: cell.data.faviconBackdrop ?? false,
+					},
 				};
 			}
 
@@ -103,6 +105,7 @@ function fromCellRows(rows: GridCellRow[]): Cell[] {
 		.map((row) => {
 			if (row.cell_type === "bookmark") {
 				if (!row.url || !row.title) return null;
+				const metadata = row.metadata ?? {};
 				return {
 					id: row.id,
 					position: { row: row.row, col: row.col },
@@ -112,6 +115,7 @@ function fromCellRows(rows: GridCellRow[]): Cell[] {
 						url: row.url,
 						title: row.title,
 						favicon: row.favicon ?? undefined,
+						faviconBackdrop: metadata.faviconBackdrop === true,
 					},
 				};
 			}
@@ -249,19 +253,51 @@ export async function saveRemoteGridState(
 		return { ok: false, error: settingsError.message };
 	}
 
-	const { error: deleteError } = await client
-		.from("grid_cells")
-		.delete()
-		.eq("user_id", userId);
-	if (deleteError) {
-		return { ok: false, error: deleteError.message };
+	const rows = toCellRows(userId, gridState.cells);
+
+	// Safety: if no non-empty cells exist locally, only clear remote cells
+	// that are outside the current grid bounds (never wipe everything).
+	if (rows.length === 0) {
+		const { error: pruneError } = await client
+			.from("grid_cells")
+			.delete()
+			.eq("user_id", userId)
+			.or(`row.gte.${settings.grid.rows},col.gte.${settings.grid.cols}`);
+		if (pruneError) {
+			return { ok: false, error: pruneError.message };
+		}
+		return { ok: true };
 	}
 
-	const rows = toCellRows(userId, gridState.cells);
-	if (rows.length > 0) {
-		const { error: insertError } = await client.from("grid_cells").insert(rows);
-		if (insertError) {
-			return { ok: false, error: insertError.message };
+	// Upsert current cells (using row+col+user_id as the conflict key)
+	const upsertRows = rows.map((r) => ({ ...r, updated_at: new Date().toISOString() }));
+	const { error: upsertError } = await client
+		.from("grid_cells")
+		.upsert(upsertRows, { onConflict: "user_id, row, col" });
+	if (upsertError) {
+		return { ok: false, error: upsertError.message };
+	}
+
+	// Remove cells that are no longer occupied (positions not in the local state)
+	const occupiedPositions = new Set(rows.map((r) => `${r.row},${r.col}`));
+	const { data: remoteCells } = await client
+		.from("grid_cells")
+		.select("id, row, col")
+		.eq("user_id", userId);
+
+	if (remoteCells) {
+		const staleIds = remoteCells
+			.filter((rc) => !occupiedPositions.has(`${rc.row},${rc.col}`))
+			.map((rc) => rc.id);
+
+		if (staleIds.length > 0) {
+			const { error: deleteError } = await client
+				.from("grid_cells")
+				.delete()
+				.in("id", staleIds);
+			if (deleteError) {
+				return { ok: false, error: deleteError.message };
+			}
 		}
 	}
 

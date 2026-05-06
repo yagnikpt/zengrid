@@ -5,6 +5,7 @@ export interface BookmarkCellData {
 	url: string;
 	title: string;
 	favicon?: string;
+	faviconBackdrop?: boolean;
 }
 
 export interface LabelCellData {

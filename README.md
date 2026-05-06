@@ -6,6 +6,10 @@ A Chrome extension that replaces your new tab page with a clean, grid-based book
 
 > This project is heavily vibe coded.
 
+## Screenshot
+
+![ZenGrid](./assets/demo.webp)
+
 ## Features
 
 **Two types of cells:**

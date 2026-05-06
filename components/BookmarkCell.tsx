@@ -1,5 +1,6 @@
 import { getFaviconUrl } from "@/lib/constants";
 import type { BookmarkCellData } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface BookmarkCellProps {
 	data: BookmarkCellData;
@@ -7,7 +8,7 @@ interface BookmarkCellProps {
 }
 
 export function BookmarkCell({ data }: BookmarkCellProps) {
-	const { url, title, favicon } = data;
+	const { url, title, favicon, faviconBackdrop } = data;
 	const faviconSrc = favicon || getFaviconUrl(url);
 
 	return (
@@ -17,7 +18,10 @@ export function BookmarkCell({ data }: BookmarkCellProps) {
 					<img
 						src={faviconSrc}
 						alt={title}
-						className="size-5 rounded object-contain"
+						className={cn(
+							"size-5 rounded object-contain",
+							faviconBackdrop && "dark:bg-foreground dark:p-px dark:rounded-sm",
+						)}
 						loading="lazy"
 						onError={(e) => {
 							(e.target as HTMLImageElement).style.display = "none";

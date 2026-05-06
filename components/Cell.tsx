@@ -20,7 +20,12 @@ import {
 	isValidUrl,
 	normalizeUrl,
 } from "@/lib/grid-utils";
-import type { CellData, CellPosition, Cell as CellType, OpenInPreference } from "@/lib/types";
+import type {
+	CellData,
+	CellPosition,
+	Cell as CellType,
+	OpenInPreference,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { BookmarkCell } from "./BookmarkCell";
 import { EmojiPicker } from "./EmojiPicker";
@@ -117,6 +122,7 @@ export function Cell({
 
 		if (isValidUrl(value)) {
 			const url = normalizeUrl(value);
+			const existingBackdrop = cell.data.type === "bookmark" ? cell.data.faviconBackdrop : undefined;
 			// Set immediately with domain fallback, then fetch real title
 			const fallbackTitle = new URL(url).hostname.replace(/^www\./, "");
 			onUpdateCell(cell.position, {
@@ -124,6 +130,7 @@ export function Cell({
 				url,
 				title: fallbackTitle,
 				favicon: getFaviconUrl(url),
+				faviconBackdrop: existingBackdrop,
 			});
 
 			// Fetch real page title in the background
@@ -134,6 +141,7 @@ export function Cell({
 						url,
 						title,
 						favicon: getFaviconUrl(url),
+						faviconBackdrop: existingBackdrop,
 					});
 				}
 			});
@@ -198,12 +206,14 @@ export function Cell({
 
 			if (isValidUrl(droppedValue)) {
 				const url = normalizeUrl(droppedValue);
+				const existingBackdrop = cell.data.type === "bookmark" ? cell.data.faviconBackdrop : undefined;
 				const fallbackTitle = new URL(url).hostname.replace(/^www\./, "");
 				onUpdateCell(cell.position, {
 					type: "bookmark",
 					url,
 					title: fallbackTitle,
 					favicon: getFaviconUrl(url),
+					faviconBackdrop: existingBackdrop,
 				});
 				fetchPageTitle(url).then((title) => {
 					if (title && title !== fallbackTitle) {
@@ -212,6 +222,7 @@ export function Cell({
 							url,
 							title,
 							favicon: getFaviconUrl(url),
+							faviconBackdrop: existingBackdrop,
 						});
 					}
 				});
@@ -227,27 +238,33 @@ export function Cell({
 	);
 
 	// Click handler
-	const handleClick = useCallback((e: React.MouseEvent) => {
-		// Shift is handled by Grid's rubber-band, don't open/edit
-		if (e.shiftKey) { e.preventDefault(); return; }
-		if (isEditing || showEmojiPicker) return;
+	const handleClick = useCallback(
+		(e: React.MouseEvent) => {
+			// Shift is handled by Grid's rubber-band, don't open/edit
+			if (e.shiftKey) {
+				e.preventDefault();
+				return;
+			}
+			if (isEditing || showEmojiPicker) return;
 
-		switch (cell.data.type) {
-			case "empty":
-				startEditing();
-				break;
-			case "label":
-				startEditing(cell.data.text, cell.data.emoji);
-				break;
-			case "bookmark":
-				if (openIn === "current-tab") {
-					window.open(cell.data.url, "_self");
-				} else {
-					window.open(cell.data.url, "_blank", "noopener");
-				}
-				break;
-		}
-	}, [cell.data, isEditing, showEmojiPicker, startEditing, openIn]);
+			switch (cell.data.type) {
+				case "empty":
+					startEditing();
+					break;
+				case "label":
+					startEditing(cell.data.text, cell.data.emoji);
+					break;
+				case "bookmark":
+					if (openIn === "current-tab") {
+						window.open(cell.data.url, "_self");
+					} else {
+						window.open(cell.data.url, "_blank", "noopener");
+					}
+					break;
+			}
+		},
+		[cell.data, isEditing, showEmojiPicker, startEditing, openIn],
+	);
 
 	// Emoji selected from picker (for label cells or new cells)
 	const handleEmojiSelect = useCallback(
@@ -314,12 +331,15 @@ export function Cell({
 			ref={mergedRef}
 			style={cellStyle}
 			{...attributes}
-			{...(cell.data.type !== "empty" && !isEditing && !showEmojiPicker && !shiftHeld
+			{...(cell.data.type !== "empty" &&
+			!isEditing &&
+			!showEmojiPicker &&
+			!shiftHeld
 				? listeners
 				: {})}
 			tabIndex={0}
 			className={cn(
-				"relative select-none overflow-visible",
+				"relative m-0.25 select-none overflow-visible",
 				"border-r border-b border-border/60",
 				"transition-colors duration-100",
 				!isEditing && "cursor-pointer hover:bg-foreground/4",
@@ -327,7 +347,6 @@ export function Cell({
 				isSelected && "ring-2 ring-inset ring-primary bg-primary/10",
 			)}
 			onClick={handleClick}
-	
 			onKeyDown={(e) => {
 				if (!isEditing && (e.key === "Enter" || e.key === " ")) {
 					e.preventDefault();
@@ -349,7 +368,10 @@ export function Cell({
 							<img
 								src={cell.data.favicon || getFaviconUrl(cell.data.url)}
 								alt={cell.data.title}
-								className="size-5 object-contain rounded"
+								className={cn(
+									"size-5 object-contain rounded",
+									cell.data.faviconBackdrop && "dark:bg-foreground dark:p-px dark:rounded-sm",
+								)}
 							/>
 						</div>
 					) : (
@@ -433,6 +455,20 @@ export function Cell({
 						<ContextMenuItem onClick={handleEdit}>
 							<Pencil className="mr-2 h-3.5 w-3.5" />
 							Edit label
+						</ContextMenuItem>
+						<ContextMenuItem
+							onClick={() => {
+								if (cell.data.type !== "bookmark") return;
+								onUpdateCell(cell.position, {
+									...cell.data,
+									faviconBackdrop: !cell.data.faviconBackdrop,
+								});
+							}}
+						>
+							<Palette className="mr-2 h-3.5 w-3.5" />
+							{cell.data.type === "bookmark" && cell.data.faviconBackdrop
+								? "Remove backdrop"
+								: "Favicon backdrop"}
 						</ContextMenuItem>
 					</>
 				)}
