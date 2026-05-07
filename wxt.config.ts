@@ -20,7 +20,7 @@ export default defineConfig({
 				id: "zengrid@local",
 			},
 		},
-		version: "0.1.0",
+		version: process.env.VERSION || "0.0.0",
 	},
 	vite: () => ({
 		plugins: [tailwindcss()],

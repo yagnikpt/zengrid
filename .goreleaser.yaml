@@ -1,0 +1,17 @@
+version: 2
+
+before:
+  hooks:
+    - bun install
+    - env VERSION={{ .Version }} bun run zip
+    - env VERSION={{ .Version }} bun run zip:firefox
+
+builds:
+  - skip: true
+
+release:
+  github:
+    owner: yagnikpt
+    name: zengrid
+  extra_files:
+    - glob: .output/*.zip
