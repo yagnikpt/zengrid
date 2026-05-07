@@ -25,19 +25,18 @@ export function useAuth() {
 		async function loadAuth() {
 			try {
 				const cachedUser = await userStorage.getValue();
-				if (!cachedUser) {
-					if (!cancelled) setUser(null);
-					return;
+				if (!cancelled) {
+					setUser(cachedUser);
+					setIsLoading(false);
 				}
+
+				if (!cachedUser) return;
 
 				const hasValidToken = await isTokenValid();
-				if (hasValidToken) {
-					if (!cancelled) setUser(cachedUser);
-					return;
-				}
+				if (hasValidToken) return;
 
 				// Browser restart / extension update clears session storage.
-				// Try to restore session with persisted refresh token.
+				// Restore in background so new tab opens instantly from local state.
 				const refreshed = await refreshAccessToken();
 				if (refreshed) {
 					const restoredUser = await userStorage.getValue();
@@ -45,7 +44,6 @@ export function useAuth() {
 					return;
 				}
 
-				// If refresh failed, clear stale local auth to avoid false "signed in" UI.
 				await Promise.all([
 					userStorage.setValue(null),
 					authTokensStorage.setValue(null),
@@ -53,9 +51,8 @@ export function useAuth() {
 				if (!cancelled) setUser(null);
 			} catch (err) {
 				console.warn("Failed to load user from storage:", err);
-				if (!cancelled) setUser(null);
-			} finally {
 				if (!cancelled) {
+					setUser(null);
 					setIsLoading(false);
 				}
 			}

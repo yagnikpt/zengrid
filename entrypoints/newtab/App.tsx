@@ -55,10 +55,29 @@ export default function App() {
 
 	if (isAuthLoading || isGridLoading) {
 		return (
-			<div className="h-screen w-screen flex items-center justify-center bg-background">
-				<div className="text-sm text-muted-foreground animate-pulse">
-					Loading...
-				</div>
+			<div className="h-screen w-screen bg-background text-foreground overflow-hidden">
+				<main className="w-full h-full border-t border-l border-border/60">
+					<div
+						className="grid w-full h-full"
+						style={{
+							gridTemplateColumns: `repeat(${settings.grid.cols}, minmax(0, 1fr))`,
+							gridTemplateRows: `repeat(${settings.grid.rows}, minmax(0, 1fr))`,
+						}}
+					>
+						<EmptyCell />
+					</div>
+					<Grid
+						cells={cells}
+						cols={settings.grid.cols}
+						rows={settings.grid.rows}
+						openIn={settings.openIn}
+						onSwap={swap}
+						onUpdateCell={updateCell}
+						onRemoveCell={removeCell}
+						onRemoveCells={removeCells}
+						onSetAccentColor={setAccentColor}
+					/>
+				</main>
 			</div>
 		);
 	}

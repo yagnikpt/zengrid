@@ -122,7 +122,8 @@ export function Cell({
 
 		if (isValidUrl(value)) {
 			const url = normalizeUrl(value);
-			const existingBackdrop = cell.data.type === "bookmark" ? cell.data.faviconBackdrop : undefined;
+			const existingBackdrop =
+				cell.data.type === "bookmark" ? cell.data.faviconBackdrop : undefined;
 			// Set immediately with domain fallback, then fetch real title
 			const fallbackTitle = new URL(url).hostname.replace(/^www\./, "");
 			onUpdateCell(cell.position, {
@@ -206,7 +207,8 @@ export function Cell({
 
 			if (isValidUrl(droppedValue)) {
 				const url = normalizeUrl(droppedValue);
-				const existingBackdrop = cell.data.type === "bookmark" ? cell.data.faviconBackdrop : undefined;
+				const existingBackdrop =
+					cell.data.type === "bookmark" ? cell.data.faviconBackdrop : undefined;
 				const fallbackTitle = new URL(url).hostname.replace(/^www\./, "");
 				onUpdateCell(cell.position, {
 					type: "bookmark",
@@ -339,7 +341,7 @@ export function Cell({
 				: {})}
 			tabIndex={0}
 			className={cn(
-				"relative m-0.25 select-none overflow-visible",
+				"relative m-px select-none overflow-visible",
 				"border-r border-b border-border/60",
 				"transition-colors duration-100",
 				!isEditing && "cursor-pointer hover:bg-foreground/4",
@@ -370,7 +372,8 @@ export function Cell({
 								alt={cell.data.title}
 								className={cn(
 									"size-5 object-contain rounded",
-									cell.data.faviconBackdrop && "dark:bg-foreground dark:p-px dark:rounded-sm",
+									cell.data.faviconBackdrop &&
+										"dark:bg-foreground dark:p-px dark:rounded-sm",
 								)}
 							/>
 						</div>

@@ -159,7 +159,8 @@ export function useGrid() {
 
 	// ── Initial remote reconciliation after auth ────────────
 	useEffect(() => {
-		if (!gridState || !settings || !initialLoadDone.current || !user) return;
+		if (isLoading || !gridState || !settings || !initialLoadDone.current || !user)
+			return;
 
 		const currentGridState = gridState;
 		const currentSettings = settings;
@@ -184,7 +185,11 @@ export function useGrid() {
 						currentSettings,
 					);
 					if (!pushed.ok) {
-						setSyncError(pushed.error ?? "Failed to initialize remote sync");
+						// Common right after extension reload/update when auth restore is still in-flight.
+						if (pushed.error !== "Not authenticated") {
+							setSyncError(pushed.error ?? "Failed to initialize remote sync");
+						}
+						return;
 					}
 					syncedUserIdRef.current = currentUser.id;
 					return;
@@ -219,7 +224,7 @@ export function useGrid() {
 		return () => {
 			cancelled = true;
 		};
-	}, [gridState, settings, user]);
+	}, [user, isLoading]);
 
 	// ── Debounced save to local + remote ────────────────────
 	useEffect(() => {

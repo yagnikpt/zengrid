@@ -1,5 +1,5 @@
--- Grid Bookmarks Supabase schema
--- Run in Supabase SQL editor or via Supabase CLI against the `grid_bookmarks` project.
+-- ZenGrid Supabase schema
+-- Run in Supabase SQL editor or via Supabase CLI against the `zengrid` project.
 
 create extension if not exists pgcrypto;
 

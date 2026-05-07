@@ -1,4 +1,4 @@
--- Harden Grid Bookmarks schema based on Supabase advisors.
+-- Harden ZenGrid schema based on Supabase advisors.
 
 create or replace function public.set_updated_at()
 returns trigger
