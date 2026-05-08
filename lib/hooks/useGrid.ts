@@ -35,7 +35,8 @@ import type {
  * Hook that manages the grid state with persistent local storage.
  *
  * 1. Loads from local storage immediately (cached data).
- * 2. Debounced save back to storage on every change.
+ * 2. Reconciles with remote once auth is ready.
+ * 3. Debounced save back to storage + remote on every change.
  */
 function clamp(value: number, min: number, max: number): number {
 	if (!Number.isFinite(value)) return min;
@@ -88,7 +89,10 @@ export function useGrid() {
 	// fallback empty grid back to storage before the real data is loaded.
 	const initialLoadDone = useRef(false);
 	const syncedUserIdRef = useRef<string | null>(null);
-	const skipNextRemoteSyncRef = useRef(false);
+
+	// Timestamp of the last successful reconciliation or remote save.
+	// The debounced save only pushes to remote if local state is newer.
+	const lastRemoteSyncAtRef = useRef(0);
 
 	// ── Load from cache on mount ────────────────────────────
 	useEffect(() => {
@@ -158,56 +162,92 @@ export function useGrid() {
 	}, []);
 
 	// ── Initial remote reconciliation after auth ────────────
+	// Uses refs to read current state, so the effect only re-runs
+	// when auth changes — never when grid/settings change.
+	const gridStateRef = useRef(gridState);
+	gridStateRef.current = gridState;
+	const settingsRef = useRef(settings);
+	settingsRef.current = settings;
+
 	useEffect(() => {
-		if (isLoading || !gridState || !settings || !initialLoadDone.current || !user)
-			return;
+		if (isLoading || !initialLoadDone.current || !user) return;
 
-		const currentGridState = gridState;
-		const currentSettings = settings;
 		const currentUser = user;
-
 		if (syncedUserIdRef.current === currentUser.id) return;
 
 		let cancelled = false;
+		let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
 		async function reconcileRemote() {
 			setIsSyncing(true);
 			setSyncError(null);
 
 			try {
-				const remote = await loadRemoteGridState(currentUser.id);
+				const result = await loadRemoteGridState(currentUser.id);
 				if (cancelled) return;
 
-				if (!remote) {
-					const pushed = await saveRemoteGridState(
-						currentUser.id,
-						currentGridState,
-						currentSettings,
-					);
-					if (!pushed.ok) {
-						// Common right after extension reload/update when auth restore is still in-flight.
-						if (pushed.error !== "Not authenticated") {
-							setSyncError(pushed.error ?? "Failed to initialize remote sync");
-						}
-						return;
+				if (result.status === "error") {
+					if (result.retriable) {
+						// Auth isn't ready yet — retry after a short delay.
+						console.info("[sync] Auth not ready, retrying reconciliation in 2s…");
+						retryTimer = setTimeout(() => {
+							if (!cancelled) reconcileRemote();
+						}, 2000);
+					} else {
+						setSyncError(result.error);
 					}
-					syncedUserIdRef.current = currentUser.id;
 					return;
 				}
 
-				// Always pull remote state on login.
-				skipNextRemoteSyncRef.current = true;
-				setSettings(normalizeSettings(remote.settings));
-				setGridState({
+				if (result.status === "empty") {
+					// No remote data — push local state to seed remote.
+					const localGrid = gridStateRef.current;
+					const localSettings = settingsRef.current;
+					if (!localGrid || !localSettings) return;
+
+					const pushed = await saveRemoteGridState(
+						currentUser.id,
+						localGrid,
+						localSettings,
+					);
+					if (cancelled) return;
+					if (!pushed.ok) {
+						setSyncError(pushed.error ?? "Failed to initialize remote sync");
+						return;
+					}
+					syncedUserIdRef.current = currentUser.id;
+					lastRemoteSyncAtRef.current = Date.now();
+					return;
+				}
+
+				// result.status === "ok" — remote data exists, pull it.
+				const remote = result.data;
+				const nextSettings = normalizeSettings(remote.settings);
+				const nextGrid: GridState = {
 					...remote.gridState,
 					cells: normalizeCells(
 						remote.gridState?.cells ?? [],
-						remote.settings?.grid?.cols ?? DEFAULT_APP_SETTINGS.grid.cols,
-						remote.settings?.grid?.rows ?? DEFAULT_APP_SETTINGS.grid.rows,
+						nextSettings.grid.cols,
+						nextSettings.grid.rows,
 					),
-				});
+				};
 
+				// Persist to local storage immediately so a crash/close
+				// before the next debounced save doesn't lose the remote data.
+				await Promise.all([
+					gridStateStorage.setValue(nextGrid),
+					settingsStorage.setValue(nextSettings),
+				]);
+
+				if (cancelled) return;
+
+				// Update React state. Set the timestamp BEFORE the setState
+				// calls so the debounced-save effect sees it and skips the
+				// redundant push back to remote.
+				lastRemoteSyncAtRef.current = Date.now();
 				syncedUserIdRef.current = currentUser.id;
+				setSettings(nextSettings);
+				setGridState(nextGrid);
 			} catch (err) {
 				if (!cancelled) {
 					setSyncError(
@@ -223,6 +263,7 @@ export function useGrid() {
 
 		return () => {
 			cancelled = true;
+			if (retryTimer) clearTimeout(retryTimer);
 		};
 	}, [user, isLoading]);
 
@@ -241,11 +282,18 @@ export function useGrid() {
 				]);
 
 				if (user && syncedUserIdRef.current === user.id) {
-					if (skipNextRemoteSyncRef.current) {
-						skipNextRemoteSyncRef.current = false;
-					} else {
+					// Only push if local state is newer than the last remote sync.
+					// This avoids pushing back the remote state we just pulled
+					// during reconciliation.
+					const localTs = Math.max(
+						gridState.updatedAt ?? 0,
+						settings.updatedAt ?? 0,
+					);
+					if (localTs > lastRemoteSyncAtRef.current) {
 						const result = await saveRemoteGridState(user.id, gridState, settings);
-						if (!result.ok) {
+						if (result.ok) {
+							lastRemoteSyncAtRef.current = Date.now();
+						} else {
 							setSyncError(result.error ?? "Failed to sync to Supabase");
 						}
 					}

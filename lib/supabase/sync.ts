@@ -1,7 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 import { refreshAccessToken } from "../auth/oauth";
-import { DEFAULT_APP_SETTINGS, authTokensStorage } from "../storage";
-import type { AppSettings, Cell, GridState, OpenInPreference, ThemePreference } from "../types";
+import { authTokensStorage, DEFAULT_APP_SETTINGS } from "../storage";
+import type {
+	AppSettings,
+	Cell,
+	GridState,
+	OpenInPreference,
+	ThemePreference,
+} from "../types";
 
 const supabaseUrl = import.meta.env.WXT_SUPABASE_URL;
 const supabasePublishableKey = import.meta.env.WXT_SUPABASE_PUBLISHABLE_KEY;
@@ -53,7 +59,7 @@ const dbClient =
 					detectSessionInUrl: false,
 					storageKey: "grid-bookmarks-db-client",
 				},
-		  })
+			})
 		: null;
 
 function toCellRows(userId: string, cells: Cell[]) {
@@ -159,47 +165,61 @@ async function getAuthedClient() {
 	return { client: dbClient, error: null };
 }
 
-export async function loadRemoteGridState(userId: string): Promise<{
-	gridState: GridState;
-	settings: AppSettings;
-} | null> {
+// ── Discriminated load result ───────────────────────────────
+export type RemoteLoadResult =
+	| { status: "ok"; data: { gridState: GridState; settings: AppSettings } }
+	| { status: "empty" }
+	| { status: "error"; error: string; retriable: boolean };
+
+export async function loadRemoteGridState(
+	userId: string,
+): Promise<RemoteLoadResult> {
 	const { client, error } = await getAuthedClient();
 	if (!client) {
-		if (error !== "Not authenticated") {
-			console.warn("[sync] Skipping remote load:", error);
-		}
-		return null;
+		// "Not authenticated" is transient (token refresh in-flight).
+		// Everything else is a hard config error.
+		return {
+			status: "error",
+			error: error ?? "No Supabase client",
+			retriable: error === "Not authenticated",
+		};
 	}
 
-	const [{ data: settingsRow, error: settingsError }, { data: cellRows, error: cellsError }] =
-		await Promise.all([
-			client
-				.from("user_settings")
-				.select("grid_cols, grid_rows, theme, open_in, updated_at")
-				.eq("user_id", userId)
-				.maybeSingle<UserSettingsRow>(),
-			client
-				.from("grid_cells")
-				.select(
-					"id, row, col, cell_type, url, title, favicon, label_text, emoji, accent_color, metadata, updated_at",
-				)
-				.eq("user_id", userId)
-				.order("row", { ascending: true })
-				.order("col", { ascending: true })
-				.returns<GridCellRow[]>(),
-		]);
+	const [
+		{ data: settingsRow, error: settingsError },
+		{ data: cellRows, error: cellsError },
+	] = await Promise.all([
+		client
+			.from("user_settings")
+			.select("grid_cols, grid_rows, theme, open_in, updated_at")
+			.eq("user_id", userId)
+			.maybeSingle<UserSettingsRow>(),
+		client
+			.from("grid_cells")
+			.select(
+				"id, row, col, cell_type, url, title, favicon, label_text, emoji, accent_color, metadata, updated_at",
+			)
+			.eq("user_id", userId)
+			.order("row", { ascending: true })
+			.order("col", { ascending: true })
+			.returns<GridCellRow[]>(),
+	]);
 
 	if (settingsError) {
-		console.error("[sync] Failed loading user_settings:", settingsError.message);
-		return null;
+		console.error(
+			"[sync] Failed loading user_settings:",
+			settingsError.message,
+		);
+		return { status: "error", error: settingsError.message, retriable: true };
 	}
 	if (cellsError) {
 		console.error("[sync] Failed loading grid_cells:", cellsError.message);
-		return null;
+		return { status: "error", error: cellsError.message, retriable: true };
 	}
 
+	// No remote data at all — user has never synced.
 	if (!settingsRow && (!cellRows || cellRows.length === 0)) {
-		return null;
+		return { status: "empty" };
 	}
 
 	const settings: AppSettings = {
@@ -221,11 +241,14 @@ export async function loadRemoteGridState(userId: string): Promise<{
 	}, 0);
 
 	return {
-		gridState: {
-			cells,
-			updatedAt: cellsUpdatedAt,
+		status: "ok",
+		data: {
+			gridState: {
+				cells,
+				updatedAt: cellsUpdatedAt,
+			},
+			settings,
 		},
-		settings,
 	};
 }
 
@@ -270,7 +293,10 @@ export async function saveRemoteGridState(
 	}
 
 	// Upsert current cells (using row+col+user_id as the conflict key)
-	const upsertRows = rows.map((r) => ({ ...r, updated_at: new Date().toISOString() }));
+	const upsertRows = rows.map((r) => ({
+		...r,
+		updated_at: new Date().toISOString(),
+	}));
 	const { error: upsertError } = await client
 		.from("grid_cells")
 		.upsert(upsertRows, { onConflict: "user_id, row, col" });

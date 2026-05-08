@@ -344,7 +344,9 @@ export function Cell({
 				"relative m-px select-none overflow-visible",
 				"border-r border-b border-border/60",
 				"transition-colors duration-100",
-				!isEditing && "cursor-pointer hover:bg-foreground/4",
+				!isEditing &&
+					cell.data.type !== "empty" &&
+					"cursor-pointer hover:bg-foreground/4",
 				isDragging && "z-50 bg-foreground/8",
 				isSelected && "ring-2 ring-inset ring-primary bg-primary/10",
 			)}
