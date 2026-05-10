@@ -23,24 +23,3 @@ export function getFaviconUrl(url: string, size = 32): string {
 // ── Sync ────────────────────────────────────────────────────
 
 export const SYNC_DEBOUNCE_MS = 2000;
-
-// ── Accent Colors ───────────────────────────────────────────
-
-export interface AccentColor {
-	name: string;
-	/** The accent color used for underlines and color swatches */
-	accent: string;
-	/** A very low-opacity version for cell backgrounds (visible on black) */
-	bg: string;
-}
-
-export const ACCENT_COLORS: AccentColor[] = [
-	{ name: "Rose", accent: "#f43f5e", bg: "rgba(244, 63, 94, 0.2)" },
-	{ name: "Orange", accent: "#f97316", bg: "rgba(249, 115, 22, 0.2)" },
-	{ name: "Yellow", accent: "#eab308", bg: "rgba(234, 179, 8, 0.2)" },
-	{ name: "Lime", accent: "#84cc16", bg: "rgba(132, 204, 22, 0.2)" },
-	{ name: "Emerald", accent: "#10b981", bg: "rgba(16, 185, 129, 0.2)" },
-	{ name: "Sky", accent: "#0ea5e9", bg: "rgba(14, 165, 233, 0.2)" },
-	{ name: "Indigo", accent: "#6366f1", bg: "rgba(99, 102, 241, 0.2)" },
-	{ name: "Purple", accent: "#a855f7", bg: "rgba(168, 85, 247, 0.2)" },
-];

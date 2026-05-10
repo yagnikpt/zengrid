@@ -4,6 +4,7 @@ import { authTokensStorage, DEFAULT_APP_SETTINGS } from "../storage";
 import type {
 	AppSettings,
 	Cell,
+	ColorModePreference,
 	GridState,
 	OpenInPreference,
 	ThemePreference,
@@ -15,10 +16,15 @@ const supabasePublishableKey = import.meta.env.WXT_SUPABASE_PUBLISHABLE_KEY;
 type UserSettingsRow = {
 	grid_cols: number;
 	grid_rows: number;
+	color_mode: ColorModePreference;
 	theme: ThemePreference;
 	open_in: OpenInPreference;
 	updated_at: string;
 };
+
+function isThemePreference(value: unknown): value is ThemePreference {
+	return value === "classic" || value === "gruvbox";
+}
 
 type GridCellRow = {
 	id: string;
@@ -191,7 +197,7 @@ export async function loadRemoteGridState(
 	] = await Promise.all([
 		client
 			.from("user_settings")
-			.select("grid_cols, grid_rows, theme, open_in, updated_at")
+			.select("grid_cols, grid_rows, color_mode, theme, open_in, updated_at")
 			.eq("user_id", userId)
 			.maybeSingle<UserSettingsRow>(),
 		client
@@ -227,7 +233,10 @@ export async function loadRemoteGridState(
 			cols: settingsRow?.grid_cols ?? DEFAULT_APP_SETTINGS.grid.cols,
 			rows: settingsRow?.grid_rows ?? DEFAULT_APP_SETTINGS.grid.rows,
 		},
-		theme: settingsRow?.theme ?? DEFAULT_APP_SETTINGS.theme,
+		colorMode: settingsRow?.color_mode ?? DEFAULT_APP_SETTINGS.colorMode,
+		theme: isThemePreference(settingsRow?.theme)
+			? settingsRow.theme
+			: DEFAULT_APP_SETTINGS.theme,
 		openIn: settingsRow?.open_in ?? DEFAULT_APP_SETTINGS.openIn,
 		updatedAt: settingsRow?.updated_at
 			? Date.parse(settingsRow.updated_at)
@@ -267,6 +276,7 @@ export async function saveRemoteGridState(
 			user_id: userId,
 			grid_cols: settings.grid.cols,
 			grid_rows: settings.grid.rows,
+			color_mode: settings.colorMode,
 			theme: settings.theme,
 			open_in: settings.openIn,
 		},

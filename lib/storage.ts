@@ -19,7 +19,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
 		cols: DEFAULT_GRID_COLS,
 		rows: DEFAULT_GRID_ROWS,
 	},
-	theme: "system",
+	colorMode: "system",
+	theme: "classic",
 	openIn: "new-tab",
 	updatedAt: Date.now(),
 };

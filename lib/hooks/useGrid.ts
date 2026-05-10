@@ -25,6 +25,7 @@ import type {
 	AppSettings,
 	CellData,
 	CellPosition,
+	ColorModePreference,
 	GridState,
 	OpenInPreference,
 	ThemePreference,
@@ -43,8 +44,12 @@ function clamp(value: number, min: number, max: number): number {
 	return Math.min(Math.max(Math.trunc(value), min), max);
 }
 
-function isThemePreference(value: unknown): value is ThemePreference {
+function isColorModePreference(value: unknown): value is ColorModePreference {
 	return value === "light" || value === "dark" || value === "system";
+}
+
+function isThemePreference(value: unknown): value is ThemePreference {
+	return value === "classic" || value === "gruvbox";
 }
 
 function isOpenInPreference(value: unknown): value is OpenInPreference {
@@ -54,6 +59,14 @@ function isOpenInPreference(value: unknown): value is OpenInPreference {
 function normalizeSettings(
 	settings: AppSettings | null | undefined,
 ): AppSettings {
+	const rawSettings = settings as
+		| (AppSettings & {
+				theme?: unknown;
+				colorMode?: unknown;
+		  })
+		| null
+		| undefined;
+
 	return {
 		...DEFAULT_APP_SETTINGS,
 		...settings,
@@ -69,8 +82,13 @@ function normalizeSettings(
 				MAX_GRID_ROWS,
 			),
 		},
-		theme: isThemePreference(settings?.theme)
-			? settings.theme
+		colorMode: isColorModePreference(rawSettings?.colorMode)
+			? rawSettings.colorMode
+			: isColorModePreference(rawSettings?.theme)
+				? rawSettings.theme
+				: DEFAULT_APP_SETTINGS.colorMode,
+		theme: isThemePreference(rawSettings?.theme)
+			? rawSettings.theme
 			: DEFAULT_APP_SETTINGS.theme,
 		openIn: isOpenInPreference(settings?.openIn)
 			? settings.openIn
@@ -395,6 +413,14 @@ export function useGrid() {
 		});
 	}, []);
 
+	const updateColorMode = useCallback((colorMode: ColorModePreference) => {
+		setSettings((prev) => ({
+			...(prev ?? DEFAULT_APP_SETTINGS),
+			colorMode,
+			updatedAt: Date.now(),
+		}));
+	}, []);
+
 	const updateTheme = useCallback((theme: ThemePreference) => {
 		setSettings((prev) => ({
 			...(prev ?? DEFAULT_APP_SETTINGS),
@@ -428,6 +454,7 @@ export function useGrid() {
 		removeCells,
 		setAccentColor,
 		updateGridDimensions,
+		updateColorMode,
 		updateTheme,
 		updateOpenIn,
 	};

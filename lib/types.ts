@@ -40,7 +40,8 @@ export interface Cell {
 
 // ── Settings ────────────────────────────────────────────────
 
-export type ThemePreference = "light" | "dark" | "system";
+export type ColorModePreference = "light" | "dark" | "system";
+export type ThemePreference = "classic" | "gruvbox";
 export type OpenInPreference = "new-tab" | "current-tab";
 
 export interface AppSettings {
@@ -48,6 +49,7 @@ export interface AppSettings {
 		cols: number;
 		rows: number;
 	};
+	colorMode: ColorModePreference;
 	theme: ThemePreference;
 	openIn: OpenInPreference;
 	updatedAt: number;

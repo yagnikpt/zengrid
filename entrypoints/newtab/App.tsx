@@ -4,6 +4,7 @@ import { Grid } from "@/components/Grid";
 import { SettingsMenu } from "@/components/SettingsMenu";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useGrid } from "@/lib/hooks/useGrid";
+import { resolveColorMode } from "@/lib/themes";
 
 export default function App() {
 	const {
@@ -18,6 +19,7 @@ export default function App() {
 		removeCells,
 		setAccentColor,
 		updateGridDimensions,
+		updateColorMode,
 		updateTheme,
 		updateOpenIn,
 	} = useGrid();
@@ -40,18 +42,24 @@ export default function App() {
 
 		const applyTheme = () => {
 			const shouldUseDark =
-				settings.theme === "dark" ||
-				(settings.theme === "system" && mediaQuery.matches);
+				resolveColorMode(settings.colorMode, mediaQuery.matches) === "dark";
 
 			root.classList.toggle("dark", shouldUseDark);
 			root.classList.toggle("light", !shouldUseDark);
+			root.dataset.theme = settings.theme;
 		};
 
 		applyTheme();
 		mediaQuery.addEventListener("change", applyTheme);
 
 		return () => mediaQuery.removeEventListener("change", applyTheme);
-	}, [settings.theme]);
+	}, [settings.colorMode, settings.theme]);
+
+	const resolvedColorMode =
+		resolveColorMode(
+			settings.colorMode,
+			window.matchMedia("(prefers-color-scheme: dark)").matches,
+		);
 
 	if (isAuthLoading || isGridLoading) {
 		return (
@@ -76,6 +84,8 @@ export default function App() {
 						onRemoveCell={removeCell}
 						onRemoveCells={removeCells}
 						onSetAccentColor={setAccentColor}
+						theme={settings.theme}
+						colorMode={resolvedColorMode}
 					/>
 				</main>
 			</div>
@@ -109,6 +119,8 @@ export default function App() {
 					onRemoveCell={removeCell}
 					onRemoveCells={removeCells}
 					onSetAccentColor={setAccentColor}
+					theme={settings.theme}
+					colorMode={resolvedColorMode}
 				/>
 			</main>
 
@@ -119,6 +131,7 @@ export default function App() {
 				syncError={syncError}
 				settings={settings}
 				onGridDimensionsChange={updateGridDimensions}
+				onColorModeChange={updateColorMode}
 				onThemeChange={updateTheme}
 				onOpenInChange={updateOpenIn}
 				onLogout={logout}

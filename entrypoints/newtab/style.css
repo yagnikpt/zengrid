@@ -118,6 +118,28 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+[data-theme="gruvbox"] {
+  --background: oklch(96.55% 0.039 100.86);
+  --foreground: oklch(36.13% 0.040 55.37);
+  --card: oklch(94.35% 0.047 96.52);
+  --card-foreground: oklch(42.49% 0.049 52.82);
+  --popover: oklch(94.35% 0.047 96.52);
+  --popover-foreground: oklch(42.49% 0.049 52.82);
+  --muted: oklch(92.20% 0.055 92.53);
+  --muted-foreground: oklch(61.92% 0.029 67.26);
+}
+
+[data-theme="gruvbox"].dark {
+  --background: oklch(24.08% 0.005 219.67);
+  --foreground: oklch(83.85% 0.056 81.25);
+  --card: oklch(27.68% 0.000 0);
+  --card-foreground: oklch(83.85% 0.056 81.25);
+  --popover: oklch(27.68% 0.000 0);
+  --popover-foreground: oklch(83.85% 0.056 81.25);
+  --muted: oklch(34.41% 0.007 48.52);
+  --muted-foreground: oklch(61.92% 0.029 67.26);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

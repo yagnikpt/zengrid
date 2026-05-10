@@ -13,18 +13,20 @@ import {
 	ContextMenuSubTrigger,
 	ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { ACCENT_COLORS, getFaviconUrl } from "@/lib/constants";
+import { getFaviconUrl } from "@/lib/constants";
 import {
 	fetchPageTitle,
 	getRandomEmoji,
 	isValidUrl,
 	normalizeUrl,
 } from "@/lib/grid-utils";
+import { getAccentColors, resolveAccentColor } from "@/lib/themes";
 import type {
 	CellData,
 	CellPosition,
 	Cell as CellType,
 	OpenInPreference,
+	ThemePreference,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { BookmarkCell } from "./BookmarkCell";
@@ -43,6 +45,8 @@ interface CellProps {
 		position: CellPosition,
 		accentColor: string | undefined,
 	) => void;
+	theme: ThemePreference;
+	colorMode: "light" | "dark";
 }
 
 export function Cell({
@@ -53,6 +57,8 @@ export function Cell({
 	onUpdateCell,
 	onRemoveCell,
 	onSetAccentColor,
+	theme,
+	colorMode,
 }: CellProps) {
 	const [isEditing, setIsEditing] = useState(false);
 	const [inputValue, setInputValue] = useState("");
@@ -312,9 +318,8 @@ export function Cell({
 	}, [cell.position, onRemoveCell]);
 
 	// Resolve accent color config for this cell
-	const accentConfig = cell.accentColor
-		? ACCENT_COLORS.find((c) => c.accent === cell.accentColor)
-		: undefined;
+	const accentConfig = resolveAccentColor(cell.accentColor, theme, colorMode);
+	const accentColors = getAccentColors(theme, colorMode);
 
 	// ── Render ──────────────────────────────────────────────
 
@@ -419,12 +424,12 @@ export function Cell({
 			) : (
 				<>
 					{cell.data.type === "bookmark" && (
-						<BookmarkCell data={cell.data} accentColor={cell.accentColor} />
+						<BookmarkCell data={cell.data} accentColor={accentConfig?.accent} />
 					)}
 					{cell.data.type === "label" && (
 						<LabelCell
 							data={cell.data}
-							accentColor={cell.accentColor}
+							accentColor={accentConfig?.accent}
 							onEmojiClick={handleLabelEmojiClick}
 						/>
 					)}
@@ -488,24 +493,30 @@ export function Cell({
 						<Palette className="mr-2 h-3.5 w-3.5" />
 						Accent color
 					</ContextMenuSubTrigger>
-					<ContextMenuSubContent className="min-w-35">
-						{ACCENT_COLORS.map((color) => (
-							<ContextMenuItem
-								key={color.accent}
-								onClick={() => onSetAccentColor(cell.position, color.accent)}
-							>
-								<span
-									className="mr-2 inline-block h-3 w-3 rounded-full shrink-0"
-									style={{ backgroundColor: color.accent }}
-								/>
-								{color.name}
-								{cell.accentColor === color.accent && (
-									<span className="ml-auto text-muted-foreground">
-										&#10003;
-									</span>
-								)}
-							</ContextMenuItem>
-						))}
+					<ContextMenuSubContent className="w-34">
+						<div className="grid grid-cols-4 gap-1 p-1">
+							{accentColors.map((color) => {
+								const selected = accentConfig?.name === color.name;
+								return (
+									<ContextMenuItem
+										key={color.name}
+										onClick={() => onSetAccentColor(cell.position, color.name)}
+										className="h-7 w-7 cursor-pointer justify-center p-0"
+										title={color.name}
+									>
+										<span
+											className={[
+												"inline-block h-4 w-4 rounded-full",
+												selected
+													? "ring-2 ring-ring ring-offset-1 ring-offset-popover"
+													: "",
+											].join(" ")}
+											style={{ backgroundColor: color.accent }}
+										/>
+									</ContextMenuItem>
+								);
+							})}
+						</div>
 						{cell.accentColor && (
 							<>
 								<ContextMenuSeparator />

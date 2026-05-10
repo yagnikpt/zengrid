@@ -17,7 +17,13 @@ import {
 import { Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { comparePositions } from "@/lib/grid-utils";
-import type { CellData, CellPosition, Cell as CellType, OpenInPreference } from "@/lib/types";
+import type {
+	CellData,
+	CellPosition,
+	Cell as CellType,
+	OpenInPreference,
+	ThemePreference,
+} from "@/lib/types";
 import { Cell } from "./Cell";
 import { DragOverlayContent } from "./DragOverlay";
 
@@ -26,6 +32,8 @@ interface GridProps {
 	cols: number;
 	rows: number;
 	openIn: OpenInPreference;
+	theme: ThemePreference;
+	colorMode: "light" | "dark";
 	onSwap: (fromPosition: CellPosition, toPosition: CellPosition) => void;
 	onUpdateCell: (position: CellPosition, data: CellData) => void;
 	onRemoveCell: (position: CellPosition) => void;
@@ -40,6 +48,8 @@ export function Grid({
 	cols,
 	rows,
 	openIn,
+	theme,
+	colorMode,
 	onSwap,
 	onUpdateCell,
 	onRemoveCell,
@@ -213,6 +223,8 @@ export function Grid({
 								onUpdateCell={onUpdateCell}
 								onRemoveCell={onRemoveCell}
 								onSetAccentColor={onSetAccentColor}
+								theme={theme}
+								colorMode={colorMode}
 							/>
 						))}
 					</div>

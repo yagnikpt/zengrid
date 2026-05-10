@@ -1,13 +1,22 @@
 import { CloudOff, Loader2, LogOut, Settings } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import {
 	MAX_GRID_COLS,
 	MAX_GRID_ROWS,
 	MIN_GRID_COLS,
 	MIN_GRID_ROWS,
 } from "@/lib/constants";
+import { THEMES } from "@/lib/themes";
 import type {
 	AppSettings,
+	ColorModePreference,
 	OpenInPreference,
 	ThemePreference,
 	User,
@@ -20,6 +29,7 @@ interface SettingsMenuProps {
 	syncError: string | null;
 	settings: AppSettings;
 	onGridDimensionsChange: (cols: number, rows: number) => void;
+	onColorModeChange: (colorMode: ColorModePreference) => void;
 	onThemeChange: (theme: ThemePreference) => void;
 	onOpenInChange: (openIn: OpenInPreference) => void;
 	onLogout: () => void;
@@ -35,6 +45,11 @@ interface GridSettingsProps {
 	cols: number;
 	rows: number;
 	onChange: (cols: number, rows: number) => void;
+}
+
+interface ColorModeSettingsProps {
+	colorMode: ColorModePreference;
+	onChange: (colorMode: ColorModePreference) => void;
 }
 
 interface ThemeSettingsProps {
@@ -60,6 +75,7 @@ export function SettingsMenu({
 	syncError,
 	settings,
 	onGridDimensionsChange,
+	onColorModeChange,
 	onThemeChange,
 	onOpenInChange,
 	onLogout,
@@ -84,7 +100,24 @@ export function SettingsMenu({
 	useEffect(() => {
 		if (!isOpen) return;
 		const handler = (e: PointerEvent) => {
-			if (!containerRef.current?.contains(e.target as Node)) close();
+			const path = e.composedPath();
+			const clickedInsideSettings = path.some(
+				(node) =>
+					node instanceof Node && !!containerRef.current?.contains(node),
+			);
+			if (clickedInsideSettings) return;
+
+			// Radix Select renders in a portal. Use the full composed path so
+			// text-node clicks inside portal content are also recognized.
+			const clickedInsideSelectPortal = path.some(
+				(node) =>
+					node instanceof Element &&
+					(node.matches('[data-slot="select-content"]') ||
+						node.closest('[data-slot="select-content"]') !== null),
+			);
+			if (clickedInsideSelectPortal) return;
+
+			close();
 		};
 		document.addEventListener("pointerdown", handler, { capture: true });
 		return () =>
@@ -109,6 +142,10 @@ export function SettingsMenu({
 							cols={settings.grid.cols}
 							rows={settings.grid.rows}
 							onChange={onGridDimensionsChange}
+						/>
+						<ColorModeSettings
+							colorMode={settings.colorMode}
+							onChange={onColorModeChange}
 						/>
 						<ThemeSettings theme={settings.theme} onChange={onThemeChange} />
 						<OpenInSettings
@@ -248,10 +285,10 @@ function GridSettings({ cols, rows, onChange }: GridSettingsProps) {
 	);
 }
 
-function ThemeSettings({ theme, onChange }: ThemeSettingsProps) {
+function ColorModeSettings({ colorMode, onChange }: ColorModeSettingsProps) {
 	return (
 		<div>
-			<SettingsHeading>Theme</SettingsHeading>
+			<SettingsHeading>Color mode</SettingsHeading>
 			<div className="grid grid-cols-3 gap-1 rounded-md border border-border bg-background p-1">
 				{(["light", "dark", "system"] as const).map((option) => (
 					<button
@@ -259,7 +296,7 @@ function ThemeSettings({ theme, onChange }: ThemeSettingsProps) {
 						key={option}
 						onClick={() => onChange(option)}
 						className={`rounded px-2 py-1 text-[11px] capitalize transition-colors ${
-							theme === option
+							colorMode === option
 								? "bg-muted"
 								: "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
 						}`}
@@ -268,6 +305,29 @@ function ThemeSettings({ theme, onChange }: ThemeSettingsProps) {
 					</button>
 				))}
 			</div>
+		</div>
+	);
+}
+
+function ThemeSettings({ theme, onChange }: ThemeSettingsProps) {
+	return (
+		<div>
+			<SettingsHeading>Theme</SettingsHeading>
+			<Select
+				value={theme}
+				onValueChange={(value) => onChange(value as ThemePreference)}
+			>
+				<SelectTrigger className="w-full bg-background text-xs">
+					<SelectValue />
+				</SelectTrigger>
+				<SelectContent>
+					{THEMES.map((option) => (
+						<SelectItem key={option.id} value={option.id}>
+							{option.name}
+						</SelectItem>
+					))}
+				</SelectContent>
+			</Select>
 		</div>
 	);
 }
