@@ -38,7 +38,10 @@ interface GridProps {
 	onUpdateCell: (position: CellPosition, data: CellData) => void;
 	onRemoveCell: (position: CellPosition) => void;
 	onRemoveCells: (positions: CellPosition[]) => void;
-	onSetAccentColor: (position: CellPosition, accentColor: string | undefined) => void;
+	onSetAccentColor: (
+		position: CellPosition,
+		accentColor: string | undefined,
+	) => void;
 }
 
 type Point = { x: number; y: number };
@@ -63,57 +66,90 @@ export function Grid({
 	// Rubber-band state
 	const gridRef = useRef<HTMLDivElement>(null);
 	const rbStart = useRef<Point | null>(null);
-	const [rbRect, setRbRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+	const [rbRect, setRbRect] = useState<{
+		left: number;
+		top: number;
+		width: number;
+		height: number;
+	} | null>(null);
 
 	// Track shift key globally
 	useEffect(() => {
-		const down = (e: KeyboardEvent) => { if (e.key === "Shift") setShiftHeld(true); };
-		const up = (e: KeyboardEvent) => { if (e.key === "Shift") setShiftHeld(false); };
+		const down = (e: KeyboardEvent) => {
+			if (e.key === "Shift") setShiftHeld(true);
+		};
+		const up = (e: KeyboardEvent) => {
+			if (e.key === "Shift") setShiftHeld(false);
+		};
 		window.addEventListener("keydown", down);
 		window.addEventListener("keyup", up);
-		return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };
+		return () => {
+			window.removeEventListener("keydown", down);
+			window.removeEventListener("keyup", up);
+		};
 	}, []);
 
 	// Delete / Escape keyboard shortcuts
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			if (e.key === "Escape") { setSelectedIds(new Set()); return; }
-			if ((e.key === "Delete" || e.key === "Backspace") && selectedIds.size > 0) {
+			if (e.key === "Escape") {
+				setSelectedIds(new Set());
+				return;
+			}
+			if (
+				(e.key === "Delete" || e.key === "Backspace") &&
+				selectedIds.size > 0
+			) {
 				if ((e.target as HTMLElement).tagName === "INPUT") return;
-				onRemoveCells(sortedCells.filter(c => selectedIds.has(c.id)).map(c => c.position));
+				onRemoveCells(
+					sortedCells
+						.filter((c) => selectedIds.has(c.id))
+						.map((c) => c.position),
+				);
 				setSelectedIds(new Set());
 			}
 		};
 		document.addEventListener("keydown", onKey);
 		return () => document.removeEventListener("keydown", onKey);
-	// eslint-disable-next-line react-hooks/exhaustive-deps
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [selectedIds, onRemoveCells]);
 
 	const sensors = useSensors(
 		useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-		useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+		useSensor(KeyboardSensor, {
+			coordinateGetter: sortableKeyboardCoordinates,
+		}),
 	);
 
 	const sortedCells = useMemo(
 		() => [...cells].sort((a, b) => comparePositions(a.position, b.position)),
 		[cells],
 	);
-	const cellIds = useMemo(() => sortedCells.map(c => c.id), [sortedCells]);
+	const cellIds = useMemo(() => sortedCells.map((c) => c.id), [sortedCells]);
 
 	// ── Rubber-band selection ─────────────────────────────────
-	const computeHitIds = useCallback((r: { left: number; top: number; width: number; height: number }) => {
-		if (!gridRef.current) return new Set<string>();
-		const result = new Set<string>();
-		const els = gridRef.current.querySelectorAll<HTMLElement>("[data-cell-id]");
-		for (const el of els) {
-			const br = el.getBoundingClientRect();
-			if (br.left < r.left + r.width && br.right > r.left && br.top < r.top + r.height && br.bottom > r.top) {
-				const id = el.getAttribute("data-cell-id");
-				if (id) result.add(id);
+	const computeHitIds = useCallback(
+		(r: { left: number; top: number; width: number; height: number }) => {
+			if (!gridRef.current) return new Set<string>();
+			const result = new Set<string>();
+			const els =
+				gridRef.current.querySelectorAll<HTMLElement>("[data-cell-id]");
+			for (const el of els) {
+				const br = el.getBoundingClientRect();
+				if (
+					br.left < r.left + r.width &&
+					br.right > r.left &&
+					br.top < r.top + r.height &&
+					br.bottom > r.top
+				) {
+					const id = el.getAttribute("data-cell-id");
+					if (id) result.add(id);
+				}
 			}
-		}
-		return result;
-	}, []);
+			return result;
+		},
+		[],
+	);
 
 	const handleGridMouseDown = useCallback((e: React.MouseEvent) => {
 		if (!e.shiftKey) return;
@@ -143,12 +179,15 @@ export function Grid({
 
 			if (dist < 5) {
 				// Treat as click: toggle the cell under the pointer
-				const el = document.elementFromPoint(s.x, s.y)?.closest("[data-cell-id]");
+				const el = document
+					.elementFromPoint(s.x, s.y)
+					?.closest("[data-cell-id]");
 				const id = el?.getAttribute("data-cell-id");
 				if (id) {
-					setSelectedIds(prev => {
+					setSelectedIds((prev) => {
 						const next = new Set(prev);
-						if (next.has(id)) next.delete(id); else next.add(id);
+						if (next.has(id)) next.delete(id);
+						else next.add(id);
 						return next;
 					});
 				}
@@ -176,22 +215,30 @@ export function Grid({
 	}, [rbRect, computeHitIds]);
 
 	// ── DnD ──────────────────────────────────────────────────
-	const handleDragStart = useCallback((event: DragStartEvent) => {
-		const cell = sortedCells.find(c => c.id === event.active.id);
-		if (cell && cell.data.type !== "empty") setActiveDragCell(cell);
-	}, [sortedCells]);
+	const handleDragStart = useCallback(
+		(event: DragStartEvent) => {
+			const cell = sortedCells.find((c) => c.id === event.active.id);
+			if (cell && cell.data.type !== "empty") setActiveDragCell(cell);
+		},
+		[sortedCells],
+	);
 
-	const handleDragEnd = useCallback((event: DragEndEvent) => {
-		setActiveDragCell(null);
-		const { active, over } = event;
-		if (!over || active.id === over.id) return;
-		const a = sortedCells.find(c => c.id === active.id);
-		const o = sortedCells.find(c => c.id === over.id);
-		if (a && o) onSwap(a.position, o.position);
-	}, [sortedCells, onSwap]);
+	const handleDragEnd = useCallback(
+		(event: DragEndEvent) => {
+			setActiveDragCell(null);
+			const { active, over } = event;
+			if (!over || active.id === over.id) return;
+			const a = sortedCells.find((c) => c.id === active.id);
+			const o = sortedCells.find((c) => c.id === over.id);
+			if (a && o) onSwap(a.position, o.position);
+		},
+		[sortedCells, onSwap],
+	);
 
 	const deleteSelected = useCallback(() => {
-		onRemoveCells(sortedCells.filter(c => selectedIds.has(c.id)).map(c => c.position));
+		onRemoveCells(
+			sortedCells.filter((c) => selectedIds.has(c.id)).map((c) => c.position),
+		);
 		setSelectedIds(new Set());
 	}, [selectedIds, sortedCells, onRemoveCells]);
 
@@ -206,14 +253,14 @@ export function Grid({
 				<SortableContext items={cellIds} strategy={rectSwappingStrategy}>
 					<div
 						ref={gridRef}
-						className="grid w-full h-full"
+						className="grid w-full h-full gap-px bg-border/60"
 						style={{
 							gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
 							gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
 						}}
 						onMouseDown={handleGridMouseDown}
 					>
-						{sortedCells.map(cell => (
+						{sortedCells.map((cell) => (
 							<Cell
 								key={cell.id}
 								cell={cell}
@@ -239,20 +286,35 @@ export function Grid({
 			{rbRect && rbRect.width > 2 && (
 				<div
 					className="fixed pointer-events-none z-50 border-2 border-primary bg-primary/10 rounded"
-					style={{ left: rbRect.left, top: rbRect.top, width: rbRect.width, height: rbRect.height }}
+					style={{
+						left: rbRect.left,
+						top: rbRect.top,
+						width: rbRect.width,
+						height: rbRect.height,
+					}}
 				/>
 			)}
 
 			{/* Selection toolbar */}
 			{selectedIds.size > 0 && (
 				<div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-xl bg-popover border border-border shadow-lg animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-150">
-					<span className="text-sm text-muted-foreground">{selectedIds.size} selected</span>
+					<span className="text-sm text-muted-foreground">
+						{selectedIds.size} selected
+					</span>
 					<div className="w-px h-4 bg-border" />
-					<button type="button" onClick={deleteSelected} className="flex items-center gap-1.5 text-sm text-destructive hover:text-destructive/80 transition-colors">
+					<button
+						type="button"
+						onClick={deleteSelected}
+						className="flex items-center gap-1.5 text-sm text-destructive hover:text-destructive/80 transition-colors"
+					>
 						<Trash2 size={14} /> Delete
 					</button>
 					<div className="w-px h-4 bg-border" />
-					<button type="button" onClick={() => setSelectedIds(new Set())} className="text-muted-foreground hover:text-foreground transition-colors">
+					<button
+						type="button"
+						onClick={() => setSelectedIds(new Set())}
+						className="text-muted-foreground hover:text-foreground transition-colors"
+					>
 						<X size={14} />
 					</button>
 				</div>

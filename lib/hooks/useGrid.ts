@@ -49,7 +49,15 @@ function isColorModePreference(value: unknown): value is ColorModePreference {
 }
 
 function isThemePreference(value: unknown): value is ThemePreference {
-	return value === "classic" || value === "gruvbox";
+	return (
+		value === "classic" ||
+		value === "gruvbox" ||
+		value === "catppuccin" ||
+		value === "github" ||
+		value === "tokyonight" ||
+		value === "rosepine" ||
+		value === "kanagawa"
+	);
 }
 
 function isOpenInPreference(value: unknown): value is OpenInPreference {

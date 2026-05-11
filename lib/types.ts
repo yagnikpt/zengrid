@@ -41,7 +41,14 @@ export interface Cell {
 // ── Settings ────────────────────────────────────────────────
 
 export type ColorModePreference = "light" | "dark" | "system";
-export type ThemePreference = "classic" | "gruvbox";
+export type ThemePreference =
+	| "classic"
+	| "gruvbox"
+	| "catppuccin"
+	| "github"
+	| "tokyonight"
+	| "rosepine"
+	| "kanagawa";
 export type OpenInPreference = "new-tab" | "current-tab";
 
 export interface AppSettings {

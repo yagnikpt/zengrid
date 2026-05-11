@@ -346,8 +346,7 @@ export function Cell({
 				: {})}
 			tabIndex={0}
 			className={cn(
-				"relative m-px select-none overflow-visible",
-				"border-r border-b border-border/60",
+				"relative select-none overflow-visible bg-background",
 				"transition-colors duration-100",
 				!isEditing &&
 					cell.data.type !== "empty" &&

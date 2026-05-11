@@ -23,7 +23,15 @@ type UserSettingsRow = {
 };
 
 function isThemePreference(value: unknown): value is ThemePreference {
-	return value === "classic" || value === "gruvbox";
+	return (
+		value === "classic" ||
+		value === "gruvbox" ||
+		value === "catppuccin" ||
+		value === "github" ||
+		value === "tokyonight" ||
+		value === "rosepine" ||
+		value === "kanagawa"
+	);
 }
 
 type GridCellRow = {
