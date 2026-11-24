@@ -21,9 +21,11 @@ import type {
 	CellData,
 	CellPosition,
 	Cell as CellType,
+	GridStylePreference,
 	OpenInPreference,
 	ThemePreference,
 } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { Cell } from "./Cell";
 import { DragOverlayContent } from "./DragOverlay";
 
@@ -34,6 +36,7 @@ interface GridProps {
 	openIn: OpenInPreference;
 	theme: ThemePreference;
 	colorMode: "light" | "dark";
+	gridStyle?: GridStylePreference;
 	onSwap: (fromPosition: CellPosition, toPosition: CellPosition) => void;
 	onUpdateCell: (position: CellPosition, data: CellData) => void;
 	onRemoveCell: (position: CellPosition) => void;
@@ -53,6 +56,7 @@ export function Grid({
 	openIn,
 	theme,
 	colorMode,
+	gridStyle = "classic",
 	onSwap,
 	onUpdateCell,
 	onRemoveCell,
@@ -242,6 +246,11 @@ export function Grid({
 		setSelectedIds(new Set());
 	}, [selectedIds, sortedCells, onRemoveCells]);
 
+	const isCards = gridStyle === "cards";
+	const isPaper = gridStyle === "paper";
+	const isTerminal = gridStyle === "terminal";
+	const isClassic = !isCards && !isPaper && !isTerminal;
+
 	return (
 		<>
 			<DndContext
@@ -253,7 +262,13 @@ export function Grid({
 				<SortableContext items={cellIds} strategy={rectSwappingStrategy}>
 					<div
 						ref={gridRef}
-						className="grid w-full h-full gap-px bg-border/60"
+						className={cn(
+							"grid w-full h-full",
+							isClassic && "gap-px bg-border/60",
+							isCards && "gap-x-5 gap-y-2 p-6 bg-transparent",
+							isPaper && "gap-0 bg-[#faf6ee] dark:bg-[#1f1e1c] p-6",
+							isTerminal && "gap-px bg-emerald-950/30 p-4 font-mono bg-[#090c10]",
+						)}
 						style={{
 							gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
 							gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
@@ -272,13 +287,16 @@ export function Grid({
 								onSetAccentColor={onSetAccentColor}
 								theme={theme}
 								colorMode={colorMode}
+								gridStyle={gridStyle}
 							/>
 						))}
 					</div>
 				</SortableContext>
 
 				<DragOverlay dropAnimation={null}>
-					{activeDragCell ? <DragOverlayContent cell={activeDragCell} /> : null}
+					{activeDragCell ? (
+						<DragOverlayContent cell={activeDragCell} style={gridStyle} />
+					) : null}
 				</DragOverlay>
 			</DndContext>
 

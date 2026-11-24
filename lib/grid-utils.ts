@@ -47,7 +47,7 @@ const EMOJI_POOL = [
 ];
 
 export function getRandomEmoji(): string {
-	return EMOJI_POOL[Math.floor(Math.random() * EMOJI_POOL.length)];
+	return EMOJI_POOL[Math.floor(Math.random() * EMOJI_POOL.length)] ?? "📁";
 }
 
 // ── Cell ID ─────────────────────────────────────────────────

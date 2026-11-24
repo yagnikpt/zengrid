@@ -1,24 +1,14 @@
-import { CloudOff, Loader2, LogOut, Settings } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
+import { CloudOff, Loader2, LogOut, Palette, Settings } from "lucide-react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import {
 	MAX_GRID_COLS,
 	MAX_GRID_ROWS,
 	MIN_GRID_COLS,
 	MIN_GRID_ROWS,
 } from "@/lib/constants";
-import { THEMES } from "@/lib/themes";
 import type {
 	AppSettings,
-	ColorModePreference,
 	OpenInPreference,
-	ThemePreference,
 	User,
 } from "@/lib/types";
 
@@ -29,9 +19,10 @@ interface SettingsMenuProps {
 	syncError: string | null;
 	settings: AppSettings;
 	onGridDimensionsChange: (cols: number, rows: number) => void;
-	onColorModeChange: (colorMode: ColorModePreference) => void;
-	onThemeChange: (theme: ThemePreference) => void;
 	onOpenInChange: (openIn: OpenInPreference) => void;
+	isAppearanceOpen?: boolean;
+	onOpenAppearance?: () => void;
+	onCloseAppearance?: () => void;
 	onLogout: () => void;
 	onSignIn: () => void;
 }
@@ -45,16 +36,6 @@ interface GridSettingsProps {
 	cols: number;
 	rows: number;
 	onChange: (cols: number, rows: number) => void;
-}
-
-interface ColorModeSettingsProps {
-	colorMode: ColorModePreference;
-	onChange: (colorMode: ColorModePreference) => void;
-}
-
-interface ThemeSettingsProps {
-	theme: ThemePreference;
-	onChange: (theme: ThemePreference) => void;
 }
 
 interface OpenInSettingsProps {
@@ -75,9 +56,10 @@ export function SettingsMenu({
 	syncError,
 	settings,
 	onGridDimensionsChange,
-	onColorModeChange,
-	onThemeChange,
 	onOpenInChange,
+	isAppearanceOpen = false,
+	onOpenAppearance,
+	onCloseAppearance,
 	onLogout,
 	onSignIn,
 }: SettingsMenuProps) {
@@ -86,20 +68,38 @@ export function SettingsMenu({
 	);
 	const containerRef = useRef<HTMLDivElement>(null);
 
-	const open = () => setPanelState("open");
+	const open = useCallback(() => setPanelState("open"), []);
 
-	const close = () => {
-		setPanelState("closing");
-		setTimeout(() => setPanelState("closed"), 150);
-	};
+	const close = useCallback(() => {
+		setPanelState((prev) => {
+			if (prev === "closed") return "closed";
+			setTimeout(() => setPanelState("closed"), 150);
+			return "closing";
+		});
+	}, []);
 
-	const toggle = () => (panelState === "open" ? close() : open());
+	const toggle = useCallback(() => {
+		setPanelState((prev) => {
+			if (prev === "open") {
+				setTimeout(() => setPanelState("closed"), 150);
+				return "closing";
+			}
+			return "open";
+		});
+	}, []);
 	const isOpen = panelState === "open";
 
-	// Close on click outside
+	// Close settings if appearance modal opens
+	useEffect(() => {
+		if (isAppearanceOpen && panelState !== "closed") {
+			setPanelState("closed");
+		}
+	}, [isAppearanceOpen, panelState]);
+
+	// Close on click outside and Esc key
 	useEffect(() => {
 		if (!isOpen) return;
-		const handler = (e: PointerEvent) => {
+		const onPointerDown = (e: PointerEvent) => {
 			const path = e.composedPath();
 			const clickedInsideSettings = path.some(
 				(node) =>
@@ -119,9 +119,20 @@ export function SettingsMenu({
 
 			close();
 		};
-		document.addEventListener("pointerdown", handler, { capture: true });
-		return () =>
-			document.removeEventListener("pointerdown", handler, { capture: true });
+
+		const onKeyDown = (e: KeyboardEvent) => {
+			if (e.key === "Escape") {
+				e.stopPropagation();
+				close();
+			}
+		};
+
+		document.addEventListener("pointerdown", onPointerDown, { capture: true });
+		window.addEventListener("keydown", onKeyDown);
+		return () => {
+			document.removeEventListener("pointerdown", onPointerDown, { capture: true });
+			window.removeEventListener("keydown", onKeyDown);
+		};
 	}, [isOpen]);
 
 	return (
@@ -143,11 +154,6 @@ export function SettingsMenu({
 							rows={settings.grid.rows}
 							onChange={onGridDimensionsChange}
 						/>
-						<ColorModeSettings
-							colorMode={settings.colorMode}
-							onChange={onColorModeChange}
-						/>
-						<ThemeSettings theme={settings.theme} onChange={onThemeChange} />
 						<OpenInSettings
 							openIn={settings.openIn}
 							onChange={onOpenInChange}
@@ -170,16 +176,41 @@ export function SettingsMenu({
 				</SettingsPanel>
 			)}
 
-			<button
-				type="button"
-				onClick={toggle}
-				className="h-9 w-9 flex items-center justify-center rounded-full border border-border bg-popover/90 backdrop-blur-sm text-muted-foreground hover:text-foreground hover:border-ring transition-all shadow-lg"
-				title="Settings"
-			>
-				<Settings
-					className={`h-4 w-4 transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}
-				/>
-			</button>
+			<div className="flex items-center gap-2">
+				<button
+					type="button"
+					onClick={() => {
+						if (panelState !== "closed") {
+							setPanelState("closed");
+						}
+						onOpenAppearance?.();
+					}}
+					aria-haspopup="dialog"
+					aria-expanded={isAppearanceOpen}
+					className="h-9 w-9 flex items-center justify-center rounded-full border border-border bg-popover/90 backdrop-blur-sm text-muted-foreground hover:text-foreground hover:border-ring transition-all shadow-lg cursor-pointer"
+					title="Appearance"
+					aria-label="Appearance settings"
+				>
+					<Palette className="h-4 w-4" />
+				</button>
+
+				<button
+					type="button"
+					onClick={() => {
+						onCloseAppearance?.();
+						toggle();
+					}}
+					aria-haspopup="true"
+					aria-expanded={isOpen}
+					className="h-9 w-9 flex items-center justify-center rounded-full border border-border bg-popover/90 backdrop-blur-sm text-muted-foreground hover:text-foreground hover:border-ring transition-all shadow-lg cursor-pointer"
+					title="Settings"
+					aria-label="Grid settings"
+				>
+					<Settings
+						className={`h-4 w-4 transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}
+					/>
+				</button>
+			</div>
 		</div>
 	);
 }
@@ -193,6 +224,8 @@ function SettingsPanel({
 }) {
 	return (
 		<div
+			role="region"
+			aria-label="Settings panel"
 			className={[
 				"mb-1 w-64 rounded-lg border border-border bg-popover/95 text-popover-foreground backdrop-blur-sm shadow-2xl overflow-hidden",
 				"origin-bottom-right duration-150",
@@ -281,53 +314,6 @@ function GridSettings({ cols, rows, onChange }: GridSettingsProps) {
 			<p className="mt-2 text-[10px] text-muted-foreground">
 				Shrinking hides cells outside the grid without deleting them.
 			</p>
-		</div>
-	);
-}
-
-function ColorModeSettings({ colorMode, onChange }: ColorModeSettingsProps) {
-	return (
-		<div>
-			<SettingsHeading>Color mode</SettingsHeading>
-			<div className="grid grid-cols-3 gap-1 rounded-md border border-border bg-background p-1">
-				{(["light", "dark", "system"] as const).map((option) => (
-					<button
-						type="button"
-						key={option}
-						onClick={() => onChange(option)}
-						className={`rounded px-2 py-1 text-[11px] capitalize transition-colors ${
-							colorMode === option
-								? "bg-muted"
-								: "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-						}`}
-					>
-						{option}
-					</button>
-				))}
-			</div>
-		</div>
-	);
-}
-
-function ThemeSettings({ theme, onChange }: ThemeSettingsProps) {
-	return (
-		<div>
-			<SettingsHeading>Theme</SettingsHeading>
-			<Select
-				value={theme}
-				onValueChange={(value) => onChange(value as ThemePreference)}
-			>
-				<SelectTrigger className="w-full bg-background text-xs">
-					<SelectValue />
-				</SelectTrigger>
-				<SelectContent>
-					{THEMES.map((option) => (
-						<SelectItem key={option.id} value={option.id}>
-							{option.name}
-						</SelectItem>
-					))}
-				</SelectContent>
-			</Select>
 		</div>
 	);
 }

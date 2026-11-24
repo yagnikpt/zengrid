@@ -49,6 +49,7 @@ export type ThemePreference =
 	| "tokyonight"
 	| "rosepine"
 	| "kanagawa";
+export type GridStylePreference = "classic" | "cards" | "paper" | "terminal";
 export type OpenInPreference = "new-tab" | "current-tab";
 
 export interface AppSettings {
@@ -58,6 +59,7 @@ export interface AppSettings {
 	};
 	colorMode: ColorModePreference;
 	theme: ThemePreference;
+	style: GridStylePreference;
 	openIn: OpenInPreference;
 	updatedAt: number;
 }

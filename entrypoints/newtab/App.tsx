@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
+import { AppearanceModal } from "@/components/AppearanceModal";
 import { AuthGate } from "@/components/AuthGate";
+import { EmptyCell } from "@/components/EmptyCell";
 import { Grid } from "@/components/Grid";
 import { SettingsMenu } from "@/components/SettingsMenu";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useGrid } from "@/lib/hooks/useGrid";
 import { resolveColorMode } from "@/lib/themes";
+import { cn } from "@/lib/utils";
 
 export default function App() {
 	const {
@@ -21,6 +24,7 @@ export default function App() {
 		updateGridDimensions,
 		updateColorMode,
 		updateTheme,
+		updateStyle,
 		updateOpenIn,
 	} = useGrid();
 
@@ -35,6 +39,7 @@ export default function App() {
 	} = useAuth();
 
 	const [showAuth, setShowAuth] = useState(false);
+	const [showAppearance, setShowAppearance] = useState(false);
 
 	useEffect(() => {
 		const root = document.documentElement;
@@ -47,13 +52,14 @@ export default function App() {
 			root.classList.toggle("dark", shouldUseDark);
 			root.classList.toggle("light", !shouldUseDark);
 			root.dataset.theme = settings.theme;
+			root.dataset.style = settings.style;
 		};
 
 		applyTheme();
 		mediaQuery.addEventListener("change", applyTheme);
 
 		return () => mediaQuery.removeEventListener("change", applyTheme);
-	}, [settings.colorMode, settings.theme]);
+	}, [settings.colorMode, settings.theme, settings.style]);
 
 	const resolvedColorMode =
 		resolveColorMode(
@@ -63,8 +69,19 @@ export default function App() {
 
 	if (isAuthLoading || isGridLoading) {
 		return (
-			<div className="h-screen w-screen bg-background text-foreground overflow-hidden">
-				<main className="w-full h-full border-t border-l border-border/60">
+			<div
+				className={cn(
+					"h-screen w-screen bg-background text-foreground overflow-hidden",
+					settings.style === "terminal" && "bg-[#090c10]",
+					settings.style === "paper" && "bg-[#faf6ee] dark:bg-[#1f1e1c]",
+				)}
+			>
+				<main
+					className={cn(
+						"w-full h-full",
+						settings.style === "classic" && "border-t border-l border-border/60",
+					)}
+				>
 					<div
 						className="grid w-full h-full"
 						style={{
@@ -72,7 +89,7 @@ export default function App() {
 							gridTemplateRows: `repeat(${settings.grid.rows}, minmax(0, 1fr))`,
 						}}
 					>
-						<EmptyCell />
+						<EmptyCell style={settings.style} />
 					</div>
 					<Grid
 						cells={cells}
@@ -86,6 +103,7 @@ export default function App() {
 						onSetAccentColor={setAccentColor}
 						theme={settings.theme}
 						colorMode={resolvedColorMode}
+						gridStyle={settings.style}
 					/>
 				</main>
 			</div>
@@ -107,8 +125,19 @@ export default function App() {
 	}
 
 	return (
-		<div className="h-screen w-screen bg-background text-foreground overflow-hidden">
-			<main className="w-full h-full border-t border-l border-border/60">
+		<div
+			className={cn(
+				"h-screen w-screen bg-background text-foreground overflow-hidden",
+				settings.style === "terminal" && "bg-[#090c10]",
+				settings.style === "paper" && "bg-[#faf6ee] dark:bg-[#1f1e1c]",
+			)}
+		>
+			<main
+				className={cn(
+					"w-full h-full",
+					settings.style === "classic" && "border-t border-l border-border/60",
+				)}
+			>
 				<Grid
 					cells={cells}
 					cols={settings.grid.cols}
@@ -121,6 +150,7 @@ export default function App() {
 					onSetAccentColor={setAccentColor}
 					theme={settings.theme}
 					colorMode={resolvedColorMode}
+					gridStyle={settings.style}
 				/>
 			</main>
 
@@ -131,11 +161,23 @@ export default function App() {
 				syncError={syncError}
 				settings={settings}
 				onGridDimensionsChange={updateGridDimensions}
-				onColorModeChange={updateColorMode}
-				onThemeChange={updateTheme}
 				onOpenInChange={updateOpenIn}
+				isAppearanceOpen={showAppearance}
+				onOpenAppearance={() => setShowAppearance((prev) => !prev)}
+				onCloseAppearance={() => setShowAppearance(false)}
 				onLogout={logout}
 				onSignIn={() => setShowAuth(true)}
+			/>
+
+			<AppearanceModal
+				isOpen={showAppearance}
+				onClose={() => setShowAppearance(false)}
+				style={settings.style}
+				onStyleChange={updateStyle}
+				colorMode={settings.colorMode}
+				onColorModeChange={updateColorMode}
+				theme={settings.theme}
+				onThemeChange={updateTheme}
 			/>
 		</div>
 	);

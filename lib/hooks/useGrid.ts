@@ -27,6 +27,7 @@ import type {
 	CellPosition,
 	ColorModePreference,
 	GridState,
+	GridStylePreference,
 	OpenInPreference,
 	ThemePreference,
 	User,
@@ -60,6 +61,15 @@ function isThemePreference(value: unknown): value is ThemePreference {
 	);
 }
 
+function isGridStylePreference(value: unknown): value is GridStylePreference {
+	return (
+		value === "classic" ||
+		value === "cards" ||
+		value === "paper" ||
+		value === "terminal"
+	);
+}
+
 function isOpenInPreference(value: unknown): value is OpenInPreference {
 	return value === "new-tab" || value === "current-tab";
 }
@@ -71,6 +81,7 @@ function normalizeSettings(
 		| (AppSettings & {
 				theme?: unknown;
 				colorMode?: unknown;
+				style?: unknown;
 		  })
 		| null
 		| undefined;
@@ -98,6 +109,9 @@ function normalizeSettings(
 		theme: isThemePreference(rawSettings?.theme)
 			? rawSettings.theme
 			: DEFAULT_APP_SETTINGS.theme,
+		style: isGridStylePreference(rawSettings?.style)
+			? rawSettings.style
+			: DEFAULT_APP_SETTINGS.style,
 		openIn: isOpenInPreference(settings?.openIn)
 			? settings.openIn
 			: DEFAULT_APP_SETTINGS.openIn,
@@ -437,6 +451,14 @@ export function useGrid() {
 		}));
 	}, []);
 
+	const updateStyle = useCallback((style: GridStylePreference) => {
+		setSettings((prev) => ({
+			...(prev ?? DEFAULT_APP_SETTINGS),
+			style,
+			updatedAt: Date.now(),
+		}));
+	}, []);
+
 	const updateOpenIn = useCallback((openIn: OpenInPreference) => {
 		setSettings((prev) => ({
 			...(prev ?? DEFAULT_APP_SETTINGS),
@@ -464,6 +486,7 @@ export function useGrid() {
 		updateGridDimensions,
 		updateColorMode,
 		updateTheme,
+		updateStyle,
 		updateOpenIn,
 	};
 }

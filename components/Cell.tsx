@@ -25,6 +25,7 @@ import type {
 	CellData,
 	CellPosition,
 	Cell as CellType,
+	GridStylePreference,
 	OpenInPreference,
 	ThemePreference,
 } from "@/lib/types";
@@ -47,6 +48,7 @@ interface CellProps {
 	) => void;
 	theme: ThemePreference;
 	colorMode: "light" | "dark";
+	gridStyle?: GridStylePreference;
 }
 
 export function Cell({
@@ -59,6 +61,7 @@ export function Cell({
 	onSetAccentColor,
 	theme,
 	colorMode,
+	gridStyle = "classic",
 }: CellProps) {
 	const [isEditing, setIsEditing] = useState(false);
 	const [inputValue, setInputValue] = useState("");
@@ -84,9 +87,9 @@ export function Cell({
 
 	// Merge refs
 	const mergedRef = useCallback(
-		(node: HTMLButtonElement | null) => {
+		(node: HTMLDivElement | null) => {
 			setNodeRef(node);
-			(cellRef as React.RefObject<HTMLButtonElement | null>).current = node;
+			cellRef.current = node;
 		},
 		[setNodeRef],
 	);
@@ -320,20 +323,27 @@ export function Cell({
 	// Resolve accent color config for this cell
 	const accentConfig = resolveAccentColor(cell.accentColor, theme, colorMode);
 	const accentColors = getAccentColors(theme, colorMode);
+	const defaultColColor =
+		accentColors[cell.position.col % accentColors.length]?.accent;
 
 	// ── Render ──────────────────────────────────────────────
+
+	const isCards = gridStyle === "cards";
+	const isPaper = gridStyle === "paper";
+	const isTerminal = gridStyle === "terminal";
+	const isClassic = !isCards && !isPaper && !isTerminal;
 
 	const cellStyle: React.CSSProperties = {
 		transform: CSS.Transform.toString(transform),
 		transition,
 		opacity: isDragging ? 0.3 : 1,
-		...(accentConfig && cell.data.type !== "empty"
+		...(accentConfig && cell.data.type !== "empty" && isClassic
 			? { backgroundColor: accentConfig.bg }
 			: {}),
 	};
 
 	const cellContent = (
-		<button
+		<div
 			data-cell-id={cell.data.type !== "empty" ? cell.id : undefined}
 			ref={mergedRef}
 			style={cellStyle}
@@ -346,13 +356,71 @@ export function Cell({
 				: {})}
 			tabIndex={0}
 			className={cn(
-				"relative select-none overflow-visible bg-background",
-				"transition-colors duration-100",
-				!isEditing &&
-					cell.data.type !== "empty" &&
-					"cursor-pointer hover:bg-foreground/4",
-				isDragging && "z-50 bg-foreground/8",
-				isSelected && "ring-2 ring-inset ring-primary bg-primary/10",
+				"relative select-none overflow-visible text-left transition-all",
+				// Classic spreadsheet styling
+				isClassic && [
+					"bg-background transition-colors duration-100",
+					!isEditing &&
+						cell.data.type !== "empty" &&
+						"cursor-pointer hover:bg-foreground/4",
+					isDragging && "z-50 bg-foreground/8",
+					isSelected && "ring-2 ring-inset ring-primary bg-primary/10",
+				],
+				// Cards styling
+				isCards && [
+					"w-full h-9.5",
+					isEditing &&
+						"rounded-lg bg-card border border-primary/60 opacity-100 shadow-md ring-2 ring-primary/20",
+					!isEditing &&
+						cell.data.type === "bookmark" && [
+							"rounded-lg bg-card text-card-foreground border border-border shadow-xs",
+							"hover:border-border/80 hover:shadow-sm transition-all cursor-pointer",
+							"dark:bg-[#1c1f24] dark:border-white/[0.06] dark:hover:bg-[#23272e] dark:hover:border-white/[0.12]",
+						],
+					!isEditing &&
+						cell.data.type === "label" && [
+							"bg-transparent cursor-pointer hover:bg-foreground/[0.03] rounded-md",
+						],
+					!isEditing &&
+						cell.data.type === "empty" && [
+							"rounded-lg border border-transparent hover:border-dashed hover:border-border/50 hover:bg-foreground/[0.04] cursor-pointer opacity-0 hover:opacity-100 transition-all",
+						],
+					isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+					isDragging && "z-50 opacity-40",
+				],
+				// Paper styling
+				isPaper && [
+					"w-full h-10 border-b border-blue-200/50 dark:border-blue-900/40 bg-transparent font-serif",
+					cell.position.col === 0 &&
+						"border-r-2 border-red-400/60 dark:border-red-500/40",
+					isEditing &&
+						"bg-amber-500/10 border-b-2 border-primary ring-1 ring-primary/30",
+					!isEditing &&
+						cell.data.type !== "empty" &&
+						"cursor-pointer hover:bg-amber-500/5 dark:hover:bg-amber-400/5",
+					!isEditing &&
+						cell.data.type === "empty" &&
+						"hover:bg-amber-500/5 cursor-pointer",
+					isSelected && "bg-amber-500/15 ring-2 ring-amber-600/50",
+					isDragging && "z-50 opacity-40",
+				],
+				// Terminal styling
+				isTerminal && [
+					"w-full h-9 font-mono border border-dashed border-emerald-950/40",
+					isEditing &&
+						"bg-black/80 border-emerald-500 ring-1 ring-emerald-500/40",
+					!isEditing &&
+						cell.data.type === "bookmark" &&
+						"bg-black/30 hover:bg-emerald-950/30 hover:border-emerald-500/40 cursor-pointer text-emerald-300",
+					!isEditing &&
+						cell.data.type === "label" &&
+						"bg-transparent cursor-pointer hover:bg-emerald-950/20",
+					!isEditing &&
+						cell.data.type === "empty" &&
+						"hover:bg-emerald-500/5 hover:border-emerald-500/30 cursor-pointer",
+					isSelected && "ring-2 ring-emerald-500 bg-emerald-500/10",
+					isDragging && "z-50 opacity-40",
+				],
 			)}
 			onClick={handleClick}
 			onKeyDown={(e) => {
@@ -423,16 +491,22 @@ export function Cell({
 			) : (
 				<>
 					{cell.data.type === "bookmark" && (
-						<BookmarkCell data={cell.data} accentColor={accentConfig?.accent} />
+						<BookmarkCell
+							data={cell.data}
+							accentColor={accentConfig?.accent}
+							style={gridStyle}
+						/>
 					)}
 					{cell.data.type === "label" && (
 						<LabelCell
 							data={cell.data}
 							accentColor={accentConfig?.accent}
+							defaultColColor={defaultColColor}
 							onEmojiClick={handleLabelEmojiClick}
+							style={gridStyle}
 						/>
 					)}
-					{cell.data.type === "empty" && <EmptyCell />}
+					{cell.data.type === "empty" && <EmptyCell style={gridStyle} />}
 					{/* Emoji picker for non-editing label cells (emoji button click) */}
 					{showEmojiPicker && cell.data.type === "label" && (
 						<EmojiPicker
@@ -442,7 +516,7 @@ export function Cell({
 					)}
 				</>
 			)}
-		</button>
+		</div>
 	);
 
 	// Empty cells don't need a context menu

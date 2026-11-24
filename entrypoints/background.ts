@@ -64,7 +64,7 @@ async function fetchTitle(url: string): Promise<string | null> {
 			if (value) html += decoder.decode(value, { stream: true });
 
 			const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-			if (match) {
+			if (match && match[1]) {
 				reader.cancel();
 				const title = match[1]
 					.replace(/&amp;/g, "&")

@@ -6,6 +6,7 @@ import type {
 	Cell,
 	ColorModePreference,
 	GridState,
+	GridStylePreference,
 	OpenInPreference,
 	ThemePreference,
 } from "../types";
@@ -18,6 +19,7 @@ type UserSettingsRow = {
 	grid_rows: number;
 	color_mode: ColorModePreference;
 	theme: ThemePreference;
+	style?: GridStylePreference;
 	open_in: OpenInPreference;
 	updated_at: string;
 };
@@ -31,6 +33,15 @@ function isThemePreference(value: unknown): value is ThemePreference {
 		value === "tokyonight" ||
 		value === "rosepine" ||
 		value === "kanagawa"
+	);
+}
+
+function isGridStylePreference(value: unknown): value is GridStylePreference {
+	return (
+		value === "classic" ||
+		value === "cards" ||
+		value === "paper" ||
+		value === "terminal"
 	);
 }
 
@@ -141,7 +152,7 @@ function fromCellRows(rows: GridCellRow[]): Cell[] {
 			}
 
 			if (row.cell_type === "label") {
-				if (!row.label_text || !row.emoji) return null;
+				if (!row.label_text) return null;
 				const metadata = row.metadata ?? {};
 				return {
 					id: row.id,
@@ -150,7 +161,7 @@ function fromCellRows(rows: GridCellRow[]): Cell[] {
 					data: {
 						type: "label" as const,
 						text: row.label_text,
-						emoji: row.emoji,
+						emoji: row.emoji ?? "📁",
 						color:
 							typeof metadata.color === "string" ? metadata.color : undefined,
 						bgColor:
@@ -205,7 +216,7 @@ export async function loadRemoteGridState(
 	] = await Promise.all([
 		client
 			.from("user_settings")
-			.select("grid_cols, grid_rows, color_mode, theme, open_in, updated_at")
+			.select("*")
 			.eq("user_id", userId)
 			.maybeSingle<UserSettingsRow>(),
 		client
@@ -245,6 +256,9 @@ export async function loadRemoteGridState(
 		theme: isThemePreference(settingsRow?.theme)
 			? settingsRow.theme
 			: DEFAULT_APP_SETTINGS.theme,
+		style: isGridStylePreference(settingsRow?.style)
+			? settingsRow.style
+			: DEFAULT_APP_SETTINGS.style,
 		openIn: settingsRow?.open_in ?? DEFAULT_APP_SETTINGS.openIn,
 		updatedAt: settingsRow?.updated_at
 			? Date.parse(settingsRow.updated_at)
@@ -279,17 +293,29 @@ export async function saveRemoteGridState(
 		return { ok: false, error: error ?? "No Supabase client" };
 	}
 
-	const { error: settingsError } = await client.from("user_settings").upsert(
-		{
-			user_id: userId,
-			grid_cols: settings.grid.cols,
-			grid_rows: settings.grid.rows,
-			color_mode: settings.colorMode,
-			theme: settings.theme,
-			open_in: settings.openIn,
-		},
-		{ onConflict: "user_id" },
-	);
+	const settingsPayload: Record<string, unknown> = {
+		user_id: userId,
+		grid_cols: settings.grid.cols,
+		grid_rows: settings.grid.rows,
+		color_mode: settings.colorMode,
+		theme: settings.theme,
+		open_in: settings.openIn,
+		style: settings.style,
+	};
+
+	let { error: settingsError } = await client
+		.from("user_settings")
+		.upsert(settingsPayload, { onConflict: "user_id" });
+
+	// Graceful fallback if style column does not exist on remote Supabase DB yet
+	if (settingsError && settingsError.message?.toLowerCase().includes("style")) {
+		delete settingsPayload.style;
+		const retry = await client
+			.from("user_settings")
+			.upsert(settingsPayload, { onConflict: "user_id" });
+		settingsError = retry.error;
+	}
+
 	if (settingsError) {
 		return { ok: false, error: settingsError.message };
 	}

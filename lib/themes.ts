@@ -221,7 +221,7 @@ export function resolveColorMode(
 }
 
 export function getThemeById(themeId: ThemePreference): ThemeDefinition {
-	return THEMES.find((theme) => theme.id === themeId) ?? THEMES[0];
+	return THEMES.find((theme) => theme.id === themeId) ?? THEMES[0]!;
 }
 
 export function getAccentColors(

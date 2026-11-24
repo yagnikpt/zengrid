@@ -1,12 +1,15 @@
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "wxt";
 
+declare const process: { env: Record<string, string | undefined> };
+
 // See https://wxt.dev/api/config.html
 export default defineConfig({
 	modules: ["@wxt-dev/module-react"],
 	dev: {
 		server: {
 			port: 3482,
+			strictPort: true,
 		},
 	},
 	manifest: {

@@ -21,6 +21,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
 	},
 	colorMode: "system",
 	theme: "classic",
+	style: "classic",
 	openIn: "new-tab",
 	updatedAt: Date.now(),
 };
